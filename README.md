@@ -38,11 +38,11 @@ Options:
 
     1. Either using curl:
 
-            curl http://localhost:8080/people/143ba45c-2fb3-35bc-b227-a6ed80b5c517 | json_pp
+            curl -d '{"test":"content"}' -H "Content-Type: application/json" -X POST http://localhost:8080/content/suggest | json_pp
 
     1. Or using [httpie](https://github.com/jkbrzt/httpie):
 
-            http GET http://localhost:8080/people/143ba45c-2fb3-35bc-b227-a6ed80b5c517
+            http POST http://localhost:8080/content/suggest test=content
 
 ## Build and deployment
 

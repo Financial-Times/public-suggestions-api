@@ -51,8 +51,7 @@ Options:
 
 ## Service endpoints
 
-e.g.
-### GET
+### POST
 
 Using curl:
 
@@ -63,8 +62,6 @@ Or using [httpie](https://github.com/jkbrzt/httpie):
     http POST http://localhost:8080/content/suggest test=content
 
 The expected response will contain information about the person, and the organisations they are connected to (via memberships).
-
-Based on the following [google doc](https://docs.google.com/document/d/1SC4Uskl-VD78y0lg5H2Gq56VCmM4OFHofZM-OvpsOFo/edit#heading=h.qjo76xuvpj83).
 
 ## Healthchecks
 Admin endpoints are:

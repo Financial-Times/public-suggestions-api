@@ -1,0 +1,5 @@
+# Values used for the deployed application.
+service:
+  name: draft-suggestion-api
+env:
+  ENV_VAR_1: "value1"

@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"testing"
+	"github.com/Financial-Times/draft-suggestion-api/web"
+)
 
 func Test_main(t *testing.T) {
 	tests := []struct {
@@ -20,7 +23,7 @@ func Test_serveEndpoints(t *testing.T) {
 		appSystemCode  string
 		appName        string
 		port           string
-		requestHandler requestHandler
+		requestHandler *web.RequestHandler
 	}
 	tests := []struct {
 		name string

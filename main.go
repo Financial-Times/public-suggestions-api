@@ -15,6 +15,8 @@ import (
 
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
+	"github.com/Financial-Times/draft-suggestion-api/web"
+	"github.com/Financial-Times/draft-suggestion-api/suggestion"
 )
 
 const appDescription = "Service serving requests made towards suggestions umbrella"
@@ -44,17 +46,24 @@ func main() {
 		EnvVar: "APP_PORT",
 	})
 
+	falconSuggestionApiBaseURL := app.String(cli.StringOpt{
+		Name:   "falcon-suggestion-api-base-url",
+		Value:  "http://falcon-suggestion-api:8080",
+		Desc:   "The base URL to falcon suggestion api",
+		EnvVar: "FALCON_SUGGESTION_API_BASE_URL",
+	})
+
 	log.SetLevel(log.InfoLevel)
-	log.Infof("[Startup] draft-suggestion-api is starting ")
+	log.Infof("[Startup] draft-suggestion-api is starting")
 
 	app.Action = func() {
 		log.Infof("System code: %s, App Name: %s, Port: %s", *appSystemCode, *appName, *port)
 
-		go func() {
-			serveEndpoints(*appSystemCode, *appName, *port, requestHandler{})
-		}()
+		aggregator := suggestion.NewAggregator(*falconSuggestionApiBaseURL)
 
-		// todo: insert app code here
+		go func() {
+			serveEndpoints(*appSystemCode, *appName, *port, web.NewRequestHandler(aggregator))
+		}()
 
 		waitForSignal()
 	}
@@ -65,7 +74,7 @@ func main() {
 	}
 }
 
-func serveEndpoints(appSystemCode string, appName string, port string, requestHandler requestHandler) {
+func serveEndpoints(appSystemCode, appName, port string, handler *web.RequestHandler) {
 	healthService := newHealthService(appSystemCode, appName, appDescription)
 
 	serveMux := http.NewServeMux()
@@ -75,7 +84,7 @@ func serveEndpoints(appSystemCode string, appName string, port string, requestHa
 	serveMux.HandleFunc(status.BuildInfoPath, status.BuildInfoHandler)
 
 	servicesRouter := mux.NewRouter()
-	servicesRouter.HandleFunc(suggestPath, requestHandler.sampleMessage).Methods("POST")
+	servicesRouter.HandleFunc(suggestPath, handler.HandleSuggestion).Methods(http.MethodPost)
 
 	var monitoringRouter http.Handler = servicesRouter
 	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log.StandardLogger(), monitoringRouter)

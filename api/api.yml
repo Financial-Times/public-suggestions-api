@@ -31,6 +31,8 @@ definitions:
       type:
         type: string
       isFTAuthor:
+        type: boolean
+    additionalProperties: false
     required:
     - predicate
     - id

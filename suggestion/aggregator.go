@@ -1,9 +1,14 @@
-package main
+package suggestion
 
-type SuggestionsAggregator struct {
+type Aggregator interface {
+	HandleSuggestion(payload []byte) []Response
 }
 
-type suggestionsType struct {
+type HTTPAggregator struct {
+	FalconSuggestionApiBaseURL string
+}
+
+type Response struct {
 	Predicate      string `json:"predicate"`
 	Id             string `json:"id"`
 	ApiUrl         string `json:"apiUrl"`
@@ -12,8 +17,12 @@ type suggestionsType struct {
 	IsFTAuthor     bool   `json:"isFTAuthor"`
 }
 
-func (aggregator *SuggestionsAggregator) sampleMessage() []suggestionsType {
-	return []suggestionsType{
+func NewAggregator(falconSuggestionApiBaseURL string) Aggregator {
+	return &HTTPAggregator{FalconSuggestionApiBaseURL: falconSuggestionApiBaseURL}
+}
+
+func (aggregator *HTTPAggregator) HandleSuggestion(payload []byte) []Response {
+	return []Response{
 		{
 			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
 			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",

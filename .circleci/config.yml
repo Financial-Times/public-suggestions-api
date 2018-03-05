@@ -1,0 +1,90 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/Financial-Times/draft-suggestion-api
+    docker:
+      - image: golang:1.8.3
+        environment:
+          GOPATH: /go
+          CIRCLE_TEST_REPORTS: /tmp/test-results
+          CIRCLE_COVERAGE_REPORT: /tmp/coverage-results
+    steps:
+      - checkout
+      - run:
+          name: External Dependencies
+          command: |
+            go get -u github.com/mattn/goveralls
+            go get -u github.com/jstemmer/go-junit-report
+            go get -u github.com/kardianos/govendor
+            go get -u github.com/haya14busa/goverage
+      - run:
+          name: Test Results
+          command: |
+            mkdir -p ${CIRCLE_TEST_REPORTS}
+            mkdir -p ${CIRCLE_COVERAGE_REPORT}
+      - run:
+          name: Govendor Sync
+          command: govendor sync -v
+      - run:
+          name: Go Build
+          command: go build -v
+      - run:
+          name: Run Tests
+          command: |
+            govendor test -race -v +local | /go/bin/go-junit-report > ${CIRCLE_TEST_REPORTS}/main.xml
+            goverage -covermode=atomic -race -coverprofile=${CIRCLE_COVERAGE_REPORT}/coverage.out ./...
+      - run:
+          name: Upload Coverage
+          command: /go/bin/goveralls -coverprofile=${CIRCLE_COVERAGE_REPORT}/coverage.out -service=circle-ci -repotoken=$COVERALLS_TOKEN
+      - store_test_results:
+          path: /tmp/test-results
+  dockerfile:
+    working_directory: /draft-suggestion-api
+    docker:
+      - image: docker:17.09.0-git
+    steps:
+      - checkout
+      - setup_docker_engine
+      - run:
+          name: Build Dockerfile
+          command: docker build -t test/draft-suggestion-api .
+      - run:
+          name: Run and Test Container
+          command: |
+            export CONTAINER_HASH=$(docker run -d -p 8080:8080 test/draft-suggestion-api)
+            docker exec ${CONTAINER_HASH} apk update
+            docker exec ${CONTAINER_HASH} apk add curl
+            docker exec ${CONTAINER_HASH} curl --retry-connrefused --retry 10 --retry-delay 3 http://localhost:8080/__health
+            docker kill ${CONTAINER_HASH}
+  dredd:
+    working_directory: /go/src/github.com/Financial-Times/draft-suggestion-api
+    docker:
+      - image: bankrs/golang-dredd:go1.8.3-dredd4.4.0
+        environment:
+          GOPATH: /go
+          FALCON_SUGGESTION_API_BASE_URL: https://httpbin.org/get
+    steps:
+      - checkout
+      - run:
+          name: External Dependencies
+          command: |
+            go get -u github.com/kardianos/govendor
+      - run:
+          name: Govendor Sync
+          command: govendor sync -v
+      - run:
+          name: Go Build
+          command: go build -v
+      - run:
+          name: Dredd API Testing
+          command: dredd
+
+workflows:
+  version: 2
+  test-and-build-docker:
+    jobs:
+      - build
+      #- dredd
+      - dockerfile:
+          requires:
+            - build

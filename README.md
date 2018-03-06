@@ -21,7 +21,7 @@ Download the source code, dependencies and test dependencies:
 1. Run the tests and install the binary:
 
         govendor sync
-        govendor test -v -race
+        govendor test -v -race +local
         go install
 
 2. Run the binary (using the `help` flag to see the available optional arguments):
@@ -30,9 +30,11 @@ Download the source code, dependencies and test dependencies:
 
 Options:
 
-        --app-system-code="draft-suggestion-api"            System Code of the application ($APP_SYSTEM_CODE)
-        --app-name="draft-suggestion-api"                   Application name ($APP_NAME)
-        --port="8080"                                           Port to listen on ($APP_PORT)
+      --app-system-code                  System Code of the application (env $APP_SYSTEM_CODE) (default "draft-suggestion-api")
+      --app-name                         Application name (env $APP_NAME) (default "draft-suggestion-api")
+      --port                             Port to listen on (env $APP_PORT) (default "9090")
+      --falcon-suggestion-api-base-url   The base URL to falcon suggestion api (env $FALCON_SUGGESTION_API_BASE_URL) (default "http://localhost:8080")
+      --falcon-suggestion-endpoint       The endpoint for falcon suggestion api (env $FALCON_SUGGESTION_ENDPOINT) (default "/content/suggest/falcon")
         
 3. Test:
 

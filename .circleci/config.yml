@@ -62,7 +62,8 @@ jobs:
       - image: bankrs/golang-dredd:go1.8.3-dredd4.4.0
         environment:
           GOPATH: /go
-          FALCON_SUGGESTION_API_BASE_URL: https://httpbin.org/get
+          FALCON_SUGGESTION_API_BASE_URL: https://httpbin.org
+          FALCON_SUGGESTION_ENDPOINT: /post
     steps:
       - checkout
       - run:

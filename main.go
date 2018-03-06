@@ -1,22 +1,26 @@
 package main
 
 import (
-	"github.com/jawher/mow.cli"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
+	log "github.com/Financial-Times/go-logger"
+	"github.com/jawher/mow.cli"
+
 	"github.com/Financial-Times/http-handlers-go/httphandlers"
 	"github.com/gorilla/mux"
 	"github.com/rcrowley/go-metrics"
 
+	"net"
+	"time"
+
+	"github.com/Financial-Times/draft-suggestion-api/service"
+	"github.com/Financial-Times/draft-suggestion-api/web"
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
-	"github.com/Financial-Times/draft-suggestion-api/web"
-	"github.com/Financial-Times/draft-suggestion-api/suggestion"
 )
 
 const appDescription = "Service serving requests made towards suggestions umbrella"
@@ -31,41 +35,53 @@ func main() {
 		Desc:   "System Code of the application",
 		EnvVar: "APP_SYSTEM_CODE",
 	})
-
 	appName := app.String(cli.StringOpt{
 		Name:   "app-name",
 		Value:  "draft-suggestion-api",
 		Desc:   "Application name",
 		EnvVar: "APP_NAME",
 	})
-
 	port := app.String(cli.StringOpt{
 		Name:   "port",
 		Value:  "8080",
 		Desc:   "Port to listen on",
 		EnvVar: "APP_PORT",
 	})
-
 	falconSuggestionApiBaseURL := app.String(cli.StringOpt{
 		Name:   "falcon-suggestion-api-base-url",
 		Value:  "http://falcon-suggestion-api:8080",
 		Desc:   "The base URL to falcon suggestion api",
 		EnvVar: "FALCON_SUGGESTION_API_BASE_URL",
 	})
+	falconSuggestionEndpoint := app.String(cli.StringOpt{
+		Name:   "falcon-suggestion-endpoint",
+		Value:  "/content/suggest/falcon",
+		Desc:   "The endpoint for falcon suggestion api",
+		EnvVar: "FALCON_SUGGESTION_ENDPOINT",
+	})
 
-	log.SetLevel(log.InfoLevel)
+	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] draft-suggestion-api is starting")
 
 	app.Action = func() {
 		log.Infof("System code: %s, App Name: %s, Port: %s", *appSystemCode, *appName, *port)
 
-		aggregator := suggestion.NewAggregator(*falconSuggestionApiBaseURL)
+		tr := &http.Transport{
+			MaxIdleConnsPerHost: 128,
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+		}
+		c := &http.Client{
+			Transport: tr,
+			Timeout:   30 * time.Second,
+		}
+		suggester := service.NewSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, suggester.Check())
 
-		go func() {
-			serveEndpoints(*appSystemCode, *appName, *port, web.NewRequestHandler(aggregator))
-		}()
+		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 
-		waitForSignal()
 	}
 	err := app.Run(os.Args)
 	if err != nil {
@@ -74,12 +90,11 @@ func main() {
 	}
 }
 
-func serveEndpoints(appSystemCode, appName, port string, handler *web.RequestHandler) {
-	healthService := newHealthService(appSystemCode, appName, appDescription)
+func serveEndpoints(port string, handler *web.RequestHandler, healthService *HealthService) {
 
 	serveMux := http.NewServeMux()
 
-	serveMux.HandleFunc(healthPath, http.HandlerFunc(fthealth.Handler(healthService.Health())))
+	serveMux.HandleFunc(healthPath, fthealth.Handler(healthService))
 	serveMux.HandleFunc(status.GTGPath, status.NewGoodToGoHandler(healthService.GTG))
 	serveMux.HandleFunc(status.BuildInfoPath, status.BuildInfoHandler)
 
@@ -87,7 +102,7 @@ func serveEndpoints(appSystemCode, appName, port string, handler *web.RequestHan
 	servicesRouter.HandleFunc(suggestPath, handler.HandleSuggestion).Methods(http.MethodPost)
 
 	var monitoringRouter http.Handler = servicesRouter
-	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log.StandardLogger(), monitoringRouter)
+	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log.Logger(), monitoringRouter)
 	monitoringRouter = httphandlers.HTTPMetricsHandler(metrics.DefaultRegistry, monitoringRouter)
 
 	serveMux.Handle("/", monitoringRouter)

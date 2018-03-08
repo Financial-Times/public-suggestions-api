@@ -15,10 +15,6 @@ type RequestHandler struct {
 	Suggester service.Suggester
 }
 
-type suggestionsResponse struct {
-	Suggestions []service.Suggestion `json:"suggestions"`
-}
-
 func NewRequestHandler(s service.Suggester) *RequestHandler {
 	return &RequestHandler{Suggester: s}
 }
@@ -47,13 +43,11 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		writeResponse(writer, http.StatusServiceUnavailable, []byte(`{"message": "Requesting suggestions failed. Please try again"}`))
 		return
 	}
-	if len(suggestions) == 0 {
+	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}
 	//ignoring marshalling errors as neither UnsupportedTypeError nor UnsupportedValueError is possible
-	jsonResponse, _ := json.Marshal(&suggestionsResponse{
-		suggestions,
-	})
+	jsonResponse, _ := json.Marshal(&suggestions)
 
 	writeResponse(writer, http.StatusOK, jsonResponse)
 

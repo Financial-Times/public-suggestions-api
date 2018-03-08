@@ -15,7 +15,7 @@ type Client interface {
 }
 
 type Suggester interface {
-	GetSuggestions(payload []byte, tid string) ([]Suggestion, error)
+	GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error)
 	Check() health.Check
 }
 
@@ -23,6 +23,10 @@ type FalconSuggester struct {
 	FalconSuggestionApiBaseURL string
 	FalconSuggestionEndpoint   string
 	Client                     Client
+}
+
+type SuggestionsResponse struct {
+	Suggestions []Suggestion `json:"suggestions"`
 }
 
 type Suggestion struct {
@@ -42,10 +46,10 @@ func NewSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, c
 	}
 }
 
-func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string) ([]Suggestion, error) {
+func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
 	req, err := http.NewRequest("POST", suggester.FalconSuggestionApiBaseURL+suggester.FalconSuggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return SuggestionsResponse{}, err
 	}
 
 	req.Header.Add("User-Agent", "UPP draft-suggestion-api")
@@ -55,23 +59,23 @@ func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string) ([]
 
 	resp, err := suggester.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return SuggestionsResponse{}, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return SuggestionsResponse{}, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Falcon Suggestion API returned HTTP %v, body: %v", resp.StatusCode, string(body))
+		return SuggestionsResponse{}, fmt.Errorf("Falcon Suggestion API returned HTTP %v, body: %v", resp.StatusCode, string(body))
 	}
 
-	var response []Suggestion
+	var response SuggestionsResponse
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return nil, err
+		return SuggestionsResponse{}, err
 	}
 	return response, nil
 }

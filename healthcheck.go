@@ -3,18 +3,18 @@ package main
 import (
 	"time"
 
-	health "github.com/Financial-Times/go-fthealth/v1_1"
+	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/Financial-Times/service-status-go/gtg"
 )
 
 const healthPath = "/__health"
 
 type HealthService struct {
-	health.TimedHealthCheck
+	fthealth.TimedHealthCheck
 	gtgChecks []gtg.StatusChecker
 }
 
-func NewHealthService(appSystemCode string, appName string, appDescription string, checks ...health.Check) *HealthService {
+func NewHealthService(appSystemCode string, appName string, appDescription string, checks ...fthealth.Check) *HealthService {
 	var gtgChecks []gtg.StatusChecker
 	for _, ch := range checks {
 		gtgChecks = append(gtgChecks, func() gtg.Status {
@@ -23,8 +23,8 @@ func NewHealthService(appSystemCode string, appName string, appDescription strin
 
 	}
 	return &HealthService{
-		TimedHealthCheck: health.TimedHealthCheck{
-			HealthCheck: health.HealthCheck{
+		TimedHealthCheck: fthealth.TimedHealthCheck{
+			HealthCheck: fthealth.HealthCheck{
 				SystemCode:  appSystemCode,
 				Name:        appName,
 				Description: appDescription,

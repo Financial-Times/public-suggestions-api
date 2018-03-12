@@ -9,9 +9,9 @@ import (
 	"github.com/Financial-Times/draft-suggestion-api/service"
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"errors"
 )
 
 func init() {

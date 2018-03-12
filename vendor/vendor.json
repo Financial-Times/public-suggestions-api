@@ -52,6 +52,13 @@
 			"revisionTime": "2017-03-28T16:39:54Z"
 		},
 		{
+			"checksumSHA1": "DuEyF75v9xaKXfJsCPRdHNOpGZk=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
+		},
+		{
 			"checksumSHA1": "IkPM2QLv9urri7S49wzroQx9oXA=",
 			"path": "github.com/gorilla/context",
 			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
@@ -122,6 +129,13 @@
 			"revisionTime": "2017-11-11T12:18:41Z"
 		},
 		{
+			"checksumSHA1": "+oyIJwPyeof36XCkY8awrNfxaNM=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
+		},
+		{
 			"checksumSHA1": "ACiFPfuj2YpfyW9acZ/Xdu4/xRU=",
 			"path": "github.com/rcrowley/go-metrics",
 			"revision": "8732c616f52954686704c8645fe1a9d59e9df7c1",
@@ -134,6 +148,31 @@
 			"revisionTime": "2017-12-05T20:32:29Z",
 			"version": "v1.0.4",
 			"versionExact": "v1.0.4"
+		},
+		{
+			"checksumSHA1": "iDI3Ec9Co5dn9MAf6VRg5cGNRPI=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/stretchr/objx",
+			"path": "github.com/stretchr/objx",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
+		},
+		{
+			"checksumSHA1": "5YCFabYzA1Zv/nGy35VDX5WBP4E=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
+		},
+		{
+			"checksumSHA1": "q+MPhXUlpfmP5UgmOySPeldXwvs=",
+			"path": "github.com/stretchr/testify/mock",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
+		},
+		{
+			"checksumSHA1": "svOZfLx/kztaEcG9IdvrQsZNdsY=",
+			"path": "github.com/stretchr/testify/require",
+			"revision": "890a5c3458b43e6104ff5da8dfa139d013d77544",
+			"revisionTime": "2017-07-05T02:17:15Z"
 		},
 		{
 			"checksumSHA1": "6U7dCaxxIMjf5V02iWgyAwppczw=",

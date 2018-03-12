@@ -5,7 +5,7 @@ import (
 	"time"
 
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
-	"github.com/golang/go/src/pkg/errors"
+	"errors"
 	"github.com/stretchr/testify/assert"
 )
 

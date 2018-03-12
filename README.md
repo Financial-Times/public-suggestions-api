@@ -57,13 +57,7 @@ Options:
 
 Using curl:
 
-    curl -d '{"test":"content"}' -H "Content-Type: application/json" -X POST http://localhost:8080/content/suggest | json_pp
-
-Or using [httpie](https://github.com/jkbrzt/httpie):
-
-    http POST http://localhost:8080/content/suggest test=content
-
-The expected response will contain information about the person, and the organisations they are connected to (via memberships).
+    curl -d '{"title":"tile", "byline": "byline", "bodyXML":"content"}' -H "Content-Type: application/json" -X POST http://localhost:8080/content/suggest | json_pp
 
 ## Healthchecks
 Admin endpoints are:

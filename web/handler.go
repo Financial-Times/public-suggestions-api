@@ -40,7 +40,7 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 	suggestions, err := handler.Suggester.GetSuggestions(body, tid)
 	if err != nil {
 		log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon suggestions API")
-		writeResponse(writer, http.StatusServiceUnavailable, []byte(`{"message": "Requesting suggestions failed. Please try again"}`))
+		writeResponse(writer, http.StatusServiceUnavailable, []byte(`{"message": "Requesting suggestions failed"}`))
 		return
 	}
 	if len(suggestions.Suggestions) == 0 {

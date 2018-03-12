@@ -1,15 +1,16 @@
 package service
 
 import (
-	"testing"
-	"net/http"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"net/http/httptest"
-	"github.com/gorilla/mux"
-	"io/ioutil"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 const sampleJSONResponse = `{

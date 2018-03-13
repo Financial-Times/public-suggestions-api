@@ -150,7 +150,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Error(err)
-	expect.Equal("Falcon Suggestion API returned HTTP 503, body: ", err.Error())
+	expect.Equal("Falcon Suggestion API returned HTTP 503", err.Error())
 	expect.Nil(suggestionResp.Suggestions)
 
 	mock.AssertExpectationsForObjects(t, mockServer)

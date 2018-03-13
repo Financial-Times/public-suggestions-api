@@ -9,7 +9,7 @@ import (
 	tidutils "github.com/Financial-Times/transactionid-utils-go"
 
 	log "github.com/Financial-Times/go-logger"
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type RequestHandler struct {

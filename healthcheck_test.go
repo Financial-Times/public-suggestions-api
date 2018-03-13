@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"errors"
+	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/stretchr/testify/assert"
 )
 

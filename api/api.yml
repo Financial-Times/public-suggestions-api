@@ -91,7 +91,7 @@ paths:
               canBeDistributed: 'yes'
       responses:
         200:
-          description: Given the body a successful response includes the suggested annotations in JSON format
+          description: Given the body a successful response includes the suggested annotations in JSON format or empty suggestions if there is not suggestion returned from downstream systems
           schema:
             type: object
             required:

@@ -10,6 +10,8 @@ import (
 	health "github.com/Financial-Times/go-fthealth/v1_1"
 )
 
+var NoContentError error
+
 type Client interface {
 	Do(req *http.Request) (resp *http.Response, err error)
 }
@@ -69,6 +71,10 @@ func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string) (Su
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNoContent {
+			NoContentError = fmt.Errorf("Falcon Suggestion API returned HTTP 204, body: %v", string(body))
+			return SuggestionsResponse{make([]Suggestion, 0)}, NoContentError
+		}
 		return SuggestionsResponse{}, fmt.Errorf("Falcon Suggestion API returned HTTP %v, body: %v", resp.StatusCode, string(body))
 	}
 

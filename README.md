@@ -54,7 +54,7 @@ Options:
 ## Service endpoints
 
 ### POST
-
+#### /content/suggest
 Using curl:
 
     curl -d '{"title":"tile", "byline": "byline", "bodyXML":"content"}' -H "Content-Type: application/json" -X POST http://localhost:8080/content/suggest | json_pp

@@ -6,12 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"errors"
 	"github.com/Financial-Times/draft-suggestion-api/service"
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"errors"
 )
 
 func init() {
@@ -76,7 +76,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
-	expect.Equal(`{"message": "Error by reading payload"}`, w.Body.String())
+	expect.Equal(`{"message": "Error while reading payload"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t) //no calls
 }
 
@@ -94,7 +94,25 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
-	expect.Equal(`{"message": "Payload should not be empty"}`, w.Body.String())
+	expect.Equal(`{"message": "Payload should be a non-empty JSON object"}`, w.Body.String())
+	mockSuggester.AssertExpectations(t) //no calls
+}
+
+func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
+	expect := assert.New(t)
+
+	body := []byte("{}")
+	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
+	req.Header.Add("X-Request-Id", "tid_test")
+	w := httptest.NewRecorder()
+
+	mockSuggester := new(mockSuggesterService)
+
+	handler := NewRequestHandler(mockSuggester)
+	handler.HandleSuggestion(w, req)
+
+	expect.Equal(http.StatusBadRequest, w.Code)
+	expect.Equal(`{"message": "Payload should be a non-empty JSON object"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t) //no calls
 }
 
@@ -117,7 +135,28 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockSuggester.AssertExpectations(t)
 }
 
-func TestRequestHandler_HandleSuggestionEmptySuggestions(t *testing.T) {
+func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T) {
+	expect := assert.New(t)
+
+	body := []byte(`{"bodyXml": "Test"}`)
+	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
+	req.Header.Add("X-Request-Id", "tid_test")
+	w := httptest.NewRecorder()
+
+	mockSuggester := new(mockSuggesterService)
+	service.NoContentError = errors.New("No content error")
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{make([]service.Suggestion, 0)}, service.NoContentError)
+
+	handler := NewRequestHandler(mockSuggester)
+	handler.HandleSuggestion(w, req)
+
+	expect.Equal(http.StatusOK, w.Code)
+	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	mockSuggester.AssertExpectations(t)
+}
+
+//Might not happen at all if MetadataServices returns always 404 when there are no suggestions
+func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	expect := assert.New(t)
 
 	body := []byte(`{"bodyXml": "Test"}`)

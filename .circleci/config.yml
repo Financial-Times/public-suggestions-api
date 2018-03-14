@@ -62,8 +62,8 @@ jobs:
       - image: bankrs/golang-dredd:go1.8.3-dredd4.4.0
         environment:
           GOPATH: /go
-          FALCON_SUGGESTION_API_BASE_URL: https://httpbin.org
-          FALCON_SUGGESTION_ENDPOINT: /post
+          FALCON_SUGGESTION_API_BASE_URL: http://localhost:9000
+      - image: peteclarkft/ersatz:stable
     steps:
       - checkout
       - run:
@@ -85,7 +85,7 @@ workflows:
   test-and-build-docker:
     jobs:
       - build
-      #- dredd
+      - dredd
       - dockerfile:
           requires:
             - build

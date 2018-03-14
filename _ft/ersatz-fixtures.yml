@@ -1,0 +1,25 @@
+version: "1.0.0"
+fixtures:
+  /content/suggest/falcon:
+    post:
+      body:
+        suggestions: 
+          - predicate: "http://www.ft.com/ontology/annotation/hasAuthor"
+            id: "http://www.ft.com/thing/071cdbc3-ed34-3120-900c-dd261f8dfe79"
+            apiUrl: "http://api.ft.com/people/071cdbc3-ed34-3120-900c-dd261f8dfe79"
+            prefLabel: "Eric Platt"
+            type: "http://www.ft.com/ontology/person/Person"
+          - predicate: "http://www.ft.com/ontology/annotation/hasAuthor"
+            id: "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a51"
+            apiUrl: "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a51"
+            prefLabel: "Michael Hunter"
+            type: "http://www.ft.com/ontology/person/Person"
+          - predicate: "http://www.ft.com/ontology/annotation/hasAuthor"
+            id: "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc494"
+            apiUrl: "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc494"
+            prefLabel: "Adam Samson"
+            type: "http://www.ft.com/ontology/person/Person"
+      headers:
+        content-type: application/json
+      status: 200
+      

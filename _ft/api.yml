@@ -118,6 +118,15 @@ paths:
                   isFTAuthor: true
         400:
           description: If an invalid JSON is sent
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+            example:
+              message: "Payload should be a non-empty JSON object"
         503:
           description: The underlying services are not working as expected.
   /__health:

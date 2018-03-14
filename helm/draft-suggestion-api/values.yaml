@@ -15,5 +15,5 @@ resources:
   limits:
     memory: 256Mi
 env:
-  FALCON_SUGGESTION_API_BASE_URL: ""
-  FALCON_SUGGESTION_ENDPOINT: ""
+  FALCON_SUGGESTION_API_BASE_URL: "" # This should be defined in the specific app-configs folder
+  FALCON_SUGGESTION_ENDPOINT: "" # This should be defined in the specific app-configs folder

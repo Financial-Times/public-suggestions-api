@@ -1,165 +1,60 @@
 package main
 
 import (
-	"reflect"
 	"testing"
+	"time"
 
+	"errors"
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
-	"github.com/Financial-Times/service-status-go/gtg"
+	"github.com/stretchr/testify/assert"
 )
 
-func Test_newHealthService(t *testing.T) {
-	type args struct {
-		appSystemCode  string
-		appName        string
-		appDescription string
-	}
-	tests := []struct {
-		name string
-		args args
-		want *HealthService
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := newHealthService(tt.args.appSystemCode, tt.args.appName, tt.args.appDescription); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("newHealthService() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+func TestNewHealthServiceNoChecks(t *testing.T) {
+	expect := assert.New(t)
+	healthService := NewHealthService("test-system-code", "test-name", "test-description")
+
+	expect.NotNil(healthService)
+	expect.Equal("test-system-code", healthService.SystemCode)
+	expect.Equal("test-name", healthService.Name)
+	expect.Equal("test-description", healthService.Description)
+	expect.Equal(10*time.Second, healthService.Timeout)
+	expect.Nil(healthService.Checks)
+	expect.Nil(healthService.gtgChecks)
 }
 
-func TestHealthService_Health(t *testing.T) {
-	type fields struct {
-		config       *HealthConfig
-		healthChecks []fthealth.Check
-		gtgChecks    []gtg.StatusChecker
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   fthealth.HC
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			service := &HealthService{
-				config:       tt.fields.config,
-				healthChecks: tt.fields.healthChecks,
-				gtgChecks:    tt.fields.gtgChecks,
-			}
-			if got := service.Health(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HealthService.Health() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+func TestHealthService_GTGSuccessfully(t *testing.T) {
+	expect := assert.New(t)
+
+	check := fthealth.Check{Name: "test-check", BusinessImpact: "none", TechnicalSummary: "nothing", PanicGuide: "http://test-url.com", Severity: 2, Checker: func() (string, error) {
+		return "everything-is-awesome", nil
+	}}
+
+	healthService := NewHealthService("", "", "", check)
+	status := healthService.GTG()
+
+	expect.Equal("", status.Message)
+	expect.True(status.GoodToGo)
 }
 
-func TestHealthService_sampleCheck(t *testing.T) {
-	type fields struct {
-		config       *HealthConfig
-		healthChecks []fthealth.Check
-		gtgChecks    []gtg.StatusChecker
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   fthealth.Check
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			service := &HealthService{
-				config:       tt.fields.config,
-				healthChecks: tt.fields.healthChecks,
-				gtgChecks:    tt.fields.gtgChecks,
-			}
-			if got := service.sampleCheck(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HealthService.sampleCheck() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+func TestHealthService_GTGError(t *testing.T) {
+	expect := assert.New(t)
 
-func TestHealthService_sampleChecker(t *testing.T) {
-	type fields struct {
-		config       *HealthConfig
-		healthChecks []fthealth.Check
-		gtgChecks    []gtg.StatusChecker
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		want    string
-		wantErr bool
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			service := &HealthService{
-				config:       tt.fields.config,
-				healthChecks: tt.fields.healthChecks,
-				gtgChecks:    tt.fields.gtgChecks,
-			}
-			got, err := service.sampleChecker()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("HealthService.sampleChecker() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("HealthService.sampleChecker() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+	check := fthealth.Check{Name: "test-check", BusinessImpact: "none", TechnicalSummary: "nothing", PanicGuide: "http://test-url.com", Severity: 2, Checker: func() (string, error) {
+		return "", errors.New("everything-is-error")
+	}}
 
-func Test_gtgCheck(t *testing.T) {
-	type args struct {
-		handler func() (string, error)
-	}
-	tests := []struct {
-		name string
-		args args
-		want gtg.Status
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := gtgCheck(tt.args.handler); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("gtgCheck() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+	healthService := NewHealthService("", "", "", check)
 
-func TestHealthService_GTG(t *testing.T) {
-	type fields struct {
-		config       *HealthConfig
-		healthChecks []fthealth.Check
-		gtgChecks    []gtg.StatusChecker
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   gtg.Status
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			service := &HealthService{
-				config:       tt.fields.config,
-				healthChecks: tt.fields.healthChecks,
-				gtgChecks:    tt.fields.gtgChecks,
-			}
-			if got := service.GTG(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("HealthService.GTG() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	expect.NotNil(healthService.Checks)
+	expect.True(len(healthService.Checks) == 1)
+	expect.Equal("test-check", healthService.Checks[0].Name)
+	expect.Equal("none", healthService.Checks[0].BusinessImpact)
+	expect.Equal("nothing", healthService.Checks[0].TechnicalSummary)
+	expect.Equal("http://test-url.com", healthService.Checks[0].PanicGuide)
+	expect.Equal(uint8(2), healthService.Checks[0].Severity)
+
+	status := healthService.GTG()
+
+	expect.Equal("everything-is-error", status.Message)
+	expect.False(status.GoodToGo)
 }

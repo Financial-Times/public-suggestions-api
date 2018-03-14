@@ -2,4 +2,5 @@
 service:
   name: draft-suggestion-api
 env:
-  ENV_VAR_1: "value1"
+  FALCON_SUGGESTION_API_BASE_URL: "http://falcon-suggestion-api:8080"
+  FALCON_SUGGESTION_ENDPOINT: "/content/suggest/falcon"

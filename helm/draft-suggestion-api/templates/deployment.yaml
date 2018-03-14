@@ -32,6 +32,11 @@ spec:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Chart.Version }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: FALCON_SUGGESTION_API_BASE_URL
+          value: "{{ .Values.env.FALCON_SUGGESTION_API_BASE_URL }}"
+        - name: FALCON_SUGGESTION_ENDPOINT
+          value: "{{ .Values.env.FALCON_SUGGESTION_ENDPOINT }}"
         ports:
         - containerPort: 8080
         livenessProbe:
@@ -44,6 +49,7 @@ spec:
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 30
+          timeoutSeconds: 3
         resources:
 {{ toYaml .Values.resources | indent 12 }}
 

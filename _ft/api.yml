@@ -1,0 +1,199 @@
+swagger: "2.0"
+
+info:
+  title: Draft Suggestion API
+  description: UPP Suggestion API for draft content
+  version: 0.0.1
+  license:
+    name: MIT
+  contact:
+    name: Universal Publishing
+    email: universal.publishing@ft.com
+
+host: api.ft.com
+basePath: "/"
+schemes:
+  - http
+  - https
+
+definitions:
+  suggestion:
+    type: object
+    properties:
+      predicate:
+        type: string
+      id:
+        type: string
+      apiUrl:
+        type: string
+      prefLabel:
+        type: string
+      type:
+        type: string
+      isFTAuthor:
+        type: boolean
+    additionalProperties: false
+    required:
+    - predicate
+    - id
+    - apiUrl
+    - prefLabel
+    - type
+paths:
+  /content/suggest:
+    post:
+      summary: Suggests annotations
+      description: Suggests annotations based on the given content in the body
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      tags:
+        - Internal API
+      parameters:
+        - name: content
+          in: body
+          description: The content in JSON format
+          required: true
+          schema:
+            type: object
+            example:
+              uuid: 9d5e441e-0b02-11e8-8eb7-42f857ea9f0
+              title: Wall Street stocks xxx
+              alternativeTitles:
+                promotionalTitle: Wall Street volatile amid global equities rout
+              type: Article
+              byline: Eric Platt in New York, Michael Hunter and Adam Samson in London
+              brands:
+              - id: http://api.ft.com/things/dbb0bdae-1f0c-11e4-b0cb-b2227cce2b54
+              identifiers:
+              - authority: http://api.ft.com/system/FTCOM-METHODE
+                identifierValue: 9d5e441e-0b02-11e8-8eb7-42f857ea9f09
+              publishedDate: '2018-02-06T16:17:08.000Z'
+              standfirst: Gauge of US market turbulence hits 50 for first time since 2015 before
+                retreating
+              body: <body><content data-embedded="true" id="c0cc4ca2-0b43-11e8-24ad-bec2279df517"
+                type="http://www.ft.com/ontology/content/ImageSet"></content><p>US stocks see-sawed
+                in early trading on Tuesday, as volatility on global markets intensified, breaking
+                an extended period of calm for investors.xxxx</body>
+              mainImage: c0cc4ca2-0b43-11e8-24ad-bec2279df517
+              standout:
+                editorsChoice: false
+                exclusive: false
+                scoop: false
+              comments:
+                enabled: true
+              publishReference: tid_7pzh8cvkue
+              lastModified: '2018-02-06T16:17:08.781Z'
+              canBeSyndicated: 'yes'
+              firstPublishedDate: '2018-02-06T07:31:29.000Z'
+              accessLevel: subscribed
+              canBeDistributed: 'yes'
+      responses:
+        200:
+          description: Given the body a successful response includes the suggested annotations in JSON format or empty suggestions if there is not suggestion returned from downstream systems
+          schema:
+            type: object
+            required:
+              - suggestions
+            properties:
+              suggestions:
+                type: array
+                items:
+                  $ref: '#/definitions/suggestion'
+            example:
+              application/json:
+                suggestions:
+                - predicate: http://www.ft.com/ontology/annotation/mentions
+                  id: http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a
+                  apiUrl: http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a
+                  prefLabel: Donald Kaberuka
+                  type: http://www.ft.com/ontology/person/Person
+                  isFTAuthor: false
+                - predicate: http://www.ft.com/ontology/annotation/mentions
+                  id: http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd
+                  apiUrl: http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd
+                  prefLabel: Lawrence Summers
+                  type: http://www.ft.com/ontology/person/Person
+                  isFTAuthor: true
+        400:
+          description: If an invalid JSON is sent
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                type: string
+            example:
+              message: "Payload should be a non-empty JSON object"
+        503:
+          description: The underlying services are not working as expected.
+  /__health:
+    get:
+      summary: Healthchecks
+      description: Runs application healthchecks and returns FT Healthcheck style json.
+      produces:
+        - application/json
+      tags:
+        - Health
+      responses:
+        200:
+          description: >
+            Should always return 200 along with the output of the healthchecks - regardless
+            of whether the healthchecks failed or not.
+            Please inspect the overall ok property to see whether or not the application is healthy.
+          examples:
+            application/json:
+              schemaVersion: 1
+              systemCode: dewey-system-code
+              name: app-name
+              description: A descriptive description
+              checks:
+                - id: check-api-health
+                  name: Check API Health
+                  ok: false
+                  severity: 1
+                  businessImpact: A business impact this failure might have
+                  technicalSummary: A technical description of what's gone wrong
+                  panicGuide: https://dewey.ft.com/dewey-system-code.html
+                  checkOutput: Technical output from the check
+                  lastUpdated: 2017-08-03T10:44:32.324709638+01:00
+              ok: true
+  /__build-info:
+    get:
+      summary: Build Information
+      description: >
+        Returns application build info, such as the git repository and revision,
+        the golang version it was built with, and the app release version.
+      produces:
+        - application/json; charset=UTF-8
+      tags:
+        - Info
+      responses:
+        200:
+          description: Outputs build information as described in the summary.
+          examples:
+            application/json; charset=UTF-8:
+              version: 0.0.1
+              repository: https://github.com/Financial-Times/app-name.git
+              revision: 7cdbdb18b4a518eef3ebb1b545fc124612f9d7cd
+              builder: go version go1.6.3 linux/amd64
+              dateTime: "20161123122615"
+  /__gtg:
+    get:
+      summary: Good To Go
+      description: Lightly healthchecks the application, and returns a 200 if it's Good-To-Go.
+      tags:
+        - Health
+      produces:
+          - text/plain; charset=US-ASCII
+      responses:
+        200:
+          description: The application is healthy enough to perform all its functions correctly - i.e. good to go.
+          examples:
+               text/plain; charset=US-ASCII: OK
+        503:
+          description: >
+            One or more of the applications healthchecks have failed,
+            so please do not use the app. See the /__health endpoint for more detailed information.

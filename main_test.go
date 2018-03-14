@@ -1,49 +1,62 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"testing"
+	"time"
 
-func Test_main(t *testing.T) {
-	tests := []struct {
-		name string
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			main()
-		})
-	}
-}
+	"github.com/stretchr/testify/require"
+)
 
-func Test_serveEndpoints(t *testing.T) {
-	type args struct {
-		appSystemCode  string
-		appName        string
-		port           string
-		requestHandler requestHandler
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			serveEndpoints(tt.args.appSystemCode, tt.args.appName, tt.args.port, tt.args.requestHandler)
-		})
-	}
-}
+func TestMainApp(t *testing.T) {
+	expect := require.New(t)
 
-func Test_waitForSignal(t *testing.T) {
-	tests := []struct {
-		name string
+	testCases := []struct {
+		endpoint       string
+		assertResponse func(response *http.Response)
 	}{
-	// TODO: Add test cases.
+		{
+			"/__gtg",
+			func(resp *http.Response) {
+				defer resp.Body.Close()
+				expect.Equal(http.StatusServiceUnavailable, resp.StatusCode)
+			},
+		},
+		{
+			"/__health",
+			func(resp *http.Response) {
+				defer resp.Body.Close()
+				expect.Equal(http.StatusOK, resp.StatusCode)
+				body, err := ioutil.ReadAll(resp.Body)
+				expect.NoError(err)
+				var checkResult map[string]interface{}
+				err = json.Unmarshal(body, &checkResult)
+				expect.NoError(err)
+				systemCode, found := checkResult["systemCode"] //check there is a valid response
+				expect.True(found)
+				expect.Equal("draft-suggestion-api", systemCode.(string))
+			},
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			waitForSignal()
-		})
+
+	waitCh := make(chan struct{})
+	go func() {
+		os.Args = []string{"draft-suggestion-api"}
+		main()
+		waitCh <- struct{}{}
+	}()
+	select {
+	case _ = <-waitCh:
+		expect.FailNow("Main should be running")
+	case <-time.After(3 * time.Second):
+		for _, testCase := range testCases {
+			resp, err := http.Get("http://localhost:8080" + testCase.endpoint)
+			expect.NoError(err)
+			expect.NotNil(resp)
+			testCase.assertResponse(resp)
+		}
 	}
 }

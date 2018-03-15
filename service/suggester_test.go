@@ -49,7 +49,7 @@ func (m *mockFalconSuggestionApiServer) startMockServer(t *testing.T) *httptest.
 	router := mux.NewRouter()
 	router.HandleFunc("/content/suggest", func(w http.ResponseWriter, r *http.Request) {
 		ua := r.Header.Get("User-Agent")
-		assert.Equal(t, "UPP draft-suggestion-api", ua)
+		assert.Equal(t, "UPP public-suggestions-api", ua)
 
 		contentTypeHeader := r.Header.Get("Content-Type")
 		acceptHeader := r.Header.Get("Accept")
@@ -228,7 +228,7 @@ func TestFalconSuggester_CheckHealth(t *testing.T) {
 	expect.Equal("falcon-suggestion-api", check.ID)
 	expect.Equal("Suggestions from TME won't work", check.BusinessImpact)
 	expect.Equal("Falcon Suggestion API Healthcheck", check.Name)
-	expect.Equal("https://dewey.in.ft.com/view/system/draft-suggestion-api", check.PanicGuide)
+	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
 	expect.Equal("Falcon Suggestion API is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)

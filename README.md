@@ -1,6 +1,6 @@
-# draft-suggestion-api
+# public-suggestions-api
 
-[![Circle CI](https://circleci.com/gh/Financial-Times/draft-suggestion-api/tree/master.png?style=shield)](https://circleci.com/gh/Financial-Times/draft-suggestion-api/tree/master)[![Go Report Card](https://goreportcard.com/badge/github.com/Financial-Times/draft-suggestion-api)](https://goreportcard.com/report/github.com/Financial-Times/draft-suggestion-api) [![Coverage Status](https://coveralls.io/repos/github/Financial-Times/draft-suggestion-api/badge.svg)](https://coveralls.io/github/Financial-Times/draft-suggestion-api)
+[![Circle CI](https://circleci.com/gh/Financial-Times/public-suggestions-api/tree/master.png?style=shield)](https://circleci.com/gh/Financial-Times/public-suggestions-api/tree/master)[![Go Report Card](https://goreportcard.com/badge/github.com/Financial-Times/public-suggestions-api)](https://goreportcard.com/report/github.com/Financial-Times/public-suggestions-api) [![Coverage Status](https://coveralls.io/repos/github/Financial-Times/public-suggestions-api/badge.svg)](https://coveralls.io/github/Financial-Times/public-suggestions-api)
 
 ## Introduction
 
@@ -11,8 +11,8 @@ Service serving requests made towards suggestions umbrella
 Download the source code, dependencies and test dependencies:
 
         go get -u github.com/kardianos/govendor
-        go get -u github.com/Financial-Times/draft-suggestion-api
-        cd $GOPATH/src/github.com/Financial-Times/draft-suggestion-api
+        go get -u github.com/Financial-Times/public-suggestions-api
+        cd $GOPATH/src/github.com/Financial-Times/public-suggestions-api
         govendor sync
         go build .
 
@@ -26,12 +26,12 @@ Download the source code, dependencies and test dependencies:
 
 2. Run the binary (using the `help` flag to see the available optional arguments):
 
-        $GOPATH/bin/draft-suggestion-api [--help]
+        $GOPATH/bin/public-suggestions-api [--help]
 
 Options:
 
-      --app-system-code                  System Code of the application (env $APP_SYSTEM_CODE) (default "draft-suggestion-api")
-      --app-name                         Application name (env $APP_NAME) (default "draft-suggestion-api")
+      --app-system-code                  System Code of the application (env $APP_SYSTEM_CODE) (default "public-suggestions-api")
+      --app-name                         Application name (env $APP_NAME) (default "public-suggestions-api")
       --port                             Port to listen on (env $APP_PORT) (default "9090")
       --falcon-suggestion-api-base-url   The base URL to falcon suggestion api (env $FALCON_SUGGESTION_API_BASE_URL) (default "http://localhost:8080")
       --falcon-suggestion-endpoint       The endpoint for falcon suggestion api (env $FALCON_SUGGESTION_ENDPOINT) (default "/content/suggest/falcon")
@@ -48,8 +48,8 @@ Options:
 
 ## Build and deployment
 
-* Built by Docker Hub on merge to master: [coco/draft-suggestion-api](https://hub.docker.com/r/coco/draft-suggestion-api/)
-* CI provided by CircleCI: [draft-suggestion-api](https://circleci.com/gh/Financial-Times/draft-suggestion-api)
+* Built by Docker Hub on merge to master: [coco/public-suggestions-api](https://hub.docker.com/r/coco/public-suggestions-api/)
+* CI provided by CircleCI: [public-suggestions-api](https://circleci.com/gh/Financial-Times/public-suggestions-api)
 
 ## Service endpoints
 

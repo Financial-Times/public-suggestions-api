@@ -55,7 +55,7 @@ func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string) (Su
 		return SuggestionsResponse{}, err
 	}
 
-	req.Header.Add("User-Agent", "UPP draft-suggestion-api")
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-Request-Id", tid)
@@ -91,7 +91,7 @@ func (suggester *FalconSuggester) Check() health.Check {
 		ID:               "falcon-suggestion-api",
 		BusinessImpact:   "Suggestions from TME won't work",
 		Name:             "Falcon Suggestion API Healthcheck",
-		PanicGuide:       "https://dewey.in.ft.com/view/system/draft-suggestion-api",
+		PanicGuide:       "https://dewey.in.ft.com/view/system/public-suggestions-api",
 		Severity:         2,
 		TechnicalSummary: "Falcon Suggestion API is not available",
 		Checker:          suggester.healthCheck,
@@ -104,7 +104,7 @@ func (suggester *FalconSuggester) healthCheck() (string, error) {
 		return "", err
 	}
 
-	req.Header.Add("User-Agent", "UPP draft-suggestion-api")
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 
 	resp, err := suggester.Client.Do(req)
 	if err != nil {

@@ -37,14 +37,14 @@ func TestMainApp(t *testing.T) {
 				expect.NoError(err)
 				systemCode, found := checkResult["systemCode"] //check there is a valid response
 				expect.True(found)
-				expect.Equal("draft-suggestion-api", systemCode.(string))
+				expect.Equal("public-suggestions-api", systemCode.(string))
 			},
 		},
 	}
 
 	waitCh := make(chan struct{})
 	go func() {
-		os.Args = []string{"draft-suggestion-api"}
+		os.Args = []string{"public-suggestions-api"}
 		main()
 		waitCh <- struct{}{}
 	}()

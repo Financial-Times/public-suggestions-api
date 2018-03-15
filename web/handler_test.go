@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"errors"
-	"github.com/Financial-Times/draft-suggestion-api/service"
+	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
 	"github.com/stretchr/testify/assert"

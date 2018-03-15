@@ -17,8 +17,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/Financial-Times/draft-suggestion-api/service"
-	"github.com/Financial-Times/draft-suggestion-api/web"
+	"github.com/Financial-Times/public-suggestions-api/service"
+	"github.com/Financial-Times/public-suggestions-api/web"
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
 )
@@ -27,17 +27,17 @@ const appDescription = "Service serving requests made towards suggestions umbrel
 const suggestPath = "/content/suggest"
 
 func main() {
-	app := cli.App("draft-suggestion-api", appDescription)
+	app := cli.App("public-suggestions-api", appDescription)
 
 	appSystemCode := app.String(cli.StringOpt{
 		Name:   "app-system-code",
-		Value:  "draft-suggestion-api",
+		Value:  "public-suggestions-api",
 		Desc:   "System Code of the application",
 		EnvVar: "APP_SYSTEM_CODE",
 	})
 	appName := app.String(cli.StringOpt{
 		Name:   "app-name",
-		Value:  "draft-suggestion-api",
+		Value:  "public-suggestions-api",
 		Desc:   "Application name",
 		EnvVar: "APP_NAME",
 	})
@@ -61,7 +61,7 @@ func main() {
 	})
 
 	log.InitDefaultLogger(*appName)
-	log.Infof("[Startup] draft-suggestion-api is starting")
+	log.Infof("[Startup] public-suggestions-api is starting")
 
 	app.Action = func() {
 		log.Infof("System code: %s, App Name: %s, Port: %s", *appSystemCode, *appName, *port)
@@ -120,7 +120,7 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *Hea
 	}()
 
 	waitForSignal()
-	log.Infof("[Shutdown] draft-suggestion-api is shutting down")
+	log.Infof("[Shutdown] public-suggestions-api is shutting down")
 
 	if err := server.Close(); err != nil {
 		log.Errorf("Unable to stop http server: %v", err)

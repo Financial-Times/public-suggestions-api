@@ -1,8 +1,8 @@
 swagger: "2.0"
 
 info:
-  title: Draft Suggestion API
-  description: UPP Suggestion API for draft content
+  title: Public Suggestions API
+  description: UPP Public Suggestions API for arbitrary content
   version: 0.0.1
   license:
     name: MIT

@@ -1,6 +1,6 @@
 FROM golang:1.8-alpine
 
-ENV PROJECT=draft-suggestion-api
+ENV PROJECT=public-suggestions-api
 COPY . /${PROJECT}-sources/
 
 RUN apk --no-cache --virtual .build-dependencies add git \
@@ -28,4 +28,4 @@ RUN apk --no-cache --virtual .build-dependencies add git \
 
 WORKDIR /
 
-CMD [ "/draft-suggestion-api" ]
+CMD [ "/public-suggestions-api" ]

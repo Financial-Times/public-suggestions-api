@@ -1,4 +1,4 @@
-# Default values for draft-suggestion-api.
+# Default values for public-suggestions-api.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 service:
@@ -6,7 +6,7 @@ service:
   hasHealthcheck: "true"
 replicaCount: 2
 image:
-  repository: coco/draft-suggestion-api
+  repository: coco/public-suggestions-api
   version: "" # should be set explicitly at installation
   pullPolicy: IfNotPresent
 resources:

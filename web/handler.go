@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/Financial-Times/draft-suggestion-api/service"
+	"github.com/Financial-Times/public-suggestions-api/service"
 	tidutils "github.com/Financial-Times/transactionid-utils-go"
 
 	log "github.com/Financial-Times/go-logger"

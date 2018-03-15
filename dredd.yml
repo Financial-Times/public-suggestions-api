@@ -2,7 +2,7 @@ dry-run: null
 hookfiles: ./_ft/dredd-hooks.js
 language: nodejs
 sandbox: false
-server: ./draft-suggestion-api
+server: ./public-suggestions-api
 server-wait: 3
 init: false
 custom: {}

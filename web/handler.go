@@ -8,8 +8,9 @@ import (
 	"github.com/Financial-Times/public-suggestions-api/service"
 	tidutils "github.com/Financial-Times/transactionid-utils-go"
 
-	log "github.com/Financial-Times/go-logger"
 	"errors"
+
+	log "github.com/Financial-Times/go-logger"
 )
 
 type RequestHandler struct {
@@ -38,24 +39,15 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	suggestions, err := handler.Suggester.GetSuggestions(body, tid)
-	if err != nil {
-		if err == service.NoContentError {
-			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
-		} else {
-			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestion API")
-			writeResponse(writer, http.StatusServiceUnavailable, []byte(`{"message": "Requesting suggestions failed"}`))
-			return
-		}
-	}
-	if len(suggestions.Suggestions) == 0 && err == nil {
+	//ignoring error as the aggregate suggester should not return any error
+	suggestions, _ := handler.Suggester.GetSuggestions(body, tid)
+	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}
 	//ignoring marshalling errors as neither UnsupportedTypeError nor UnsupportedValueError is possible
 	jsonResponse, _ := json.Marshal(suggestions)
 
 	writeResponse(writer, http.StatusOK, jsonResponse)
-
 }
 
 func validatePayload(content []byte) (bool, error) {
@@ -64,7 +56,7 @@ func validatePayload(content []byte) (bool, error) {
 		return false, err
 	}
 	if len(payload) == 0 {
-		return false, errors.New("Valid but empty JSON request")
+		return false, errors.New("valid but empty JSON request")
 	}
 	return true, nil
 }

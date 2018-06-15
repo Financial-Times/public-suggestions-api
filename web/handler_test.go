@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"errors"
-	"github.com/Financial-Times/public-suggestions-api/service"
+
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -125,13 +126,13 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{}, errors.New("Timeout error"))
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
 	handler := NewRequestHandler(mockSuggester)
 	handler.HandleSuggestion(w, req)
 
-	expect.Equal(http.StatusServiceUnavailable, w.Code)
-	expect.Equal(`{"message": "Requesting suggestions failed"}`, w.Body.String())
+	expect.Equal(http.StatusOK, w.Code)
+	expect.Equal(`{"suggestions":[]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 

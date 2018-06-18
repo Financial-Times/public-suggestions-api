@@ -71,7 +71,7 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 		suggestionEndpoint: authorsSuggestionEndpoint,
 		client:             client,
 		name:               "Authors Suggestion API",
-		systemId:           "authors-suggestion-api",
+		systemId:           "authors-suggestions-api",
 		failureImpact:      "Suggesting authors from Concept Search won't work",
 	}
 }

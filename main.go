@@ -60,8 +60,8 @@ func main() {
 		EnvVar: "FALCON_SUGGESTION_ENDPOINT",
 	})
 	authorsSuggestionApiBaseURL := app.String(cli.StringOpt{
-		Name:   "authors-suggestion-api-base-url",
-		Value:  "http://authors-suggestion-api:8080",
+		Name:   "authors-suggestions-api-base-url",
+		Value:  "http://authors-suggestions-api:8080",
 		Desc:   "The base URL to authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_API_BASE_URL",
 	})

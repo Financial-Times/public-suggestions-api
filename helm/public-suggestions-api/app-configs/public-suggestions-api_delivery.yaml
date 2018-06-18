@@ -4,5 +4,5 @@ service:
 env:
   FALCON_SUGGESTION_API_BASE_URL: "http://falcon-suggestion-api:8080"
   FALCON_SUGGESTION_ENDPOINT: "/content/suggest/falcon"
-  AUTHORS_SUGGESTION_API_BASE_URL: "http://authors-suggestion-api:8080"
+  AUTHORS_SUGGESTION_API_BASE_URL: "http://authors-suggestions-api:8080"
   AUTHORS_SUGGESTION_ENDPOINT: "/content/suggest/authors"

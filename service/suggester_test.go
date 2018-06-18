@@ -295,7 +295,7 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	check := suggester.Check()
 	checkResult, err := check.Checker()
 
-	expect.Equal("authors-suggestion-api", check.ID)
+	expect.Equal("authors-suggestions-api", check.ID)
 	expect.Equal("Suggesting authors from Concept Search won't work", check.BusinessImpact)
 	expect.Equal("Authors Suggestion API Healthcheck", check.Name)
 	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
@@ -313,7 +313,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
 	}}, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestions-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
@@ -322,7 +322,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
 
-	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+	expect.Equal(response.Suggestions[0].Id, "authors-suggestions-api")
 	expect.Equal(response.Suggestions[1].Id, "falcon-suggestion-api")
 
 	suggestionApi.AssertExpectations(t)
@@ -333,7 +333,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	suggestionApi := new(mockSuggestionApi)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestions-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
@@ -342,7 +342,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
-	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+	expect.Equal(response.Suggestions[0].Id, "authors-suggestions-api")
 
 	suggestionApi.AssertExpectations(t)
 }
@@ -374,7 +374,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 		{Predicate: hasAuthor, IsFTAuthor: true, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
 	}}, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: hasAuthor, IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		{Predicate: hasAuthor, IsFTAuthor: true, Id: "authors-suggestions-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
@@ -383,7 +383,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
-	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+	expect.Equal(response.Suggestions[0].Id, "authors-suggestions-api")
 
 	suggestionApi.AssertExpectations(t)
 }

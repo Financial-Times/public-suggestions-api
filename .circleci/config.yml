@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/Financial-Times/public-suggestions-api
     docker:
-      - image: golang:1.8.3
+      - image: golang:1.10
         environment:
           GOPATH: /go
           CIRCLE_TEST_REPORTS: /tmp/test-results
@@ -15,7 +15,7 @@ jobs:
           command: |
             go get -u github.com/mattn/goveralls
             go get -u github.com/jstemmer/go-junit-report
-            go get -u github.com/kardianos/govendor
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             go get -u github.com/haya14busa/goverage
       - run:
           name: Test Results
@@ -23,15 +23,15 @@ jobs:
             mkdir -p ${CIRCLE_TEST_REPORTS}
             mkdir -p ${CIRCLE_COVERAGE_REPORT}
       - run:
-          name: Govendor Sync
-          command: govendor sync -v
+          name: Download vendored dependancies
+          command: dep ensure -v -vendor-only
       - run:
           name: Go Build
           command: go build -v
       - run:
           name: Run Tests
           command: |
-            govendor test -race -v +local | /go/bin/go-junit-report > ${CIRCLE_TEST_REPORTS}/main.xml
+            go test -race -v ./... | /go/bin/go-junit-report > ${CIRCLE_TEST_REPORTS}/main.xml
             goverage -covermode=atomic -race -coverprofile=${CIRCLE_COVERAGE_REPORT}/coverage.out ./...
       - run:
           name: Upload Coverage
@@ -69,10 +69,10 @@ jobs:
       - run:
           name: External Dependencies
           command: |
-            go get -u github.com/kardianos/govendor
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
       - run:
-          name: Govendor Sync
-          command: govendor sync -v
+          name: Download vendored dependancies
+          command: dep ensure -v -vendor-only
       - run:
           name: Go Build
           command: go build -v

@@ -22,7 +22,7 @@ func TestMainApp(t *testing.T) {
 			"/__gtg",
 			func(resp *http.Response) {
 				defer resp.Body.Close()
-				expect.Equal(http.StatusServiceUnavailable, resp.StatusCode)
+				expect.Equal(http.StatusOK, resp.StatusCode)
 			},
 		},
 		{

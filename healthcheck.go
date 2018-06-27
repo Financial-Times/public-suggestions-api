@@ -15,13 +15,6 @@ type HealthService struct {
 }
 
 func NewHealthService(appSystemCode string, appName string, appDescription string, checks ...fthealth.Check) *HealthService {
-	var gtgChecks []gtg.StatusChecker
-	for _, ch := range checks {
-		gtgChecks = append(gtgChecks, func() gtg.Status {
-			return gtgCheck(ch.Checker)
-		})
-
-	}
 	return &HealthService{
 		TimedHealthCheck: fthealth.TimedHealthCheck{
 			HealthCheck: fthealth.HealthCheck{
@@ -32,16 +25,14 @@ func NewHealthService(appSystemCode string, appName string, appDescription strin
 			},
 			Timeout: 10 * time.Second,
 		},
-		gtgChecks: gtgChecks,
+		gtgChecks: []gtg.StatusChecker{
+			func() gtg.Status {
+				// always return as gtg, since we don't want to block overall suggestions if one of the downstream services are not working
+				return gtg.Status{GoodToGo: true}
+			},
+		},
 	}
 
-}
-
-func gtgCheck(handler func() (string, error)) gtg.Status {
-	if _, err := handler(); err != nil {
-		return gtg.Status{GoodToGo: false, Message: err.Error()}
-	}
-	return gtg.Status{GoodToGo: true}
 }
 
 func (service *HealthService) GTG() gtg.Status {

@@ -17,9 +17,9 @@ import (
 	"net"
 	"time"
 
+	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
-	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
 )
 
@@ -59,6 +59,18 @@ func main() {
 		Desc:   "The endpoint for falcon suggestion api",
 		EnvVar: "FALCON_SUGGESTION_ENDPOINT",
 	})
+	authorsSuggestionApiBaseURL := app.String(cli.StringOpt{
+		Name:   "authors-suggestion-api-base-url",
+		Value:  "http://authors-suggestion-api:8080",
+		Desc:   "The base URL to authors suggestion api",
+		EnvVar: "AUTHORS_SUGGESTION_API_BASE_URL",
+	})
+	authorsSuggestionEndpoint := app.String(cli.StringOpt{
+		Name:   "authors-suggestion-endpoint",
+		Value:  "/content/suggest/authors",
+		Desc:   "The endpoint for authors suggestion api",
+		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
+	})
 
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
@@ -77,8 +89,10 @@ func main() {
 			Transport: tr,
 			Timeout:   30 * time.Second,
 		}
-		suggester := service.NewSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, suggester.Check())
+		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
+		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
+		suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

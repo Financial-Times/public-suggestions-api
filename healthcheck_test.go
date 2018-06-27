@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"errors"
+
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,7 +20,7 @@ func TestNewHealthServiceNoChecks(t *testing.T) {
 	expect.Equal("test-description", healthService.Description)
 	expect.Equal(10*time.Second, healthService.Timeout)
 	expect.Nil(healthService.Checks)
-	expect.Nil(healthService.gtgChecks)
+	expect.NotNil(healthService.gtgChecks)
 }
 
 func TestHealthService_GTGSuccessfully(t *testing.T) {
@@ -36,7 +37,7 @@ func TestHealthService_GTGSuccessfully(t *testing.T) {
 	expect.True(status.GoodToGo)
 }
 
-func TestHealthService_GTGError(t *testing.T) {
+func TestHealthService_GTGSuccessfullyWhenHealthError(t *testing.T) {
 	expect := assert.New(t)
 
 	check := fthealth.Check{Name: "test-check", BusinessImpact: "none", TechnicalSummary: "nothing", PanicGuide: "http://test-url.com", Severity: 2, Checker: func() (string, error) {
@@ -55,6 +56,6 @@ func TestHealthService_GTGError(t *testing.T) {
 
 	status := healthService.GTG()
 
-	expect.Equal("everything-is-error", status.Message)
-	expect.False(status.GoodToGo)
+	expect.Equal("", status.Message)
+	expect.True(status.GoodToGo)
 }

@@ -41,6 +41,15 @@ type mockResponseBody struct {
 	mock.Mock
 }
 
+type mockSuggestionApi struct {
+	mock.Mock
+}
+
+func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+	args := m.Called(payload, tid)
+	return args.Get(0).(SuggestionsResponse), args.Error(1)
+}
+
 type mockFalconSuggestionApiServer struct {
 	mock.Mock
 }
@@ -126,7 +135,7 @@ func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 
-	suggester := NewSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions(body, "tid_test")
 
 	actualSuggestions := suggestionResp.Suggestions
@@ -146,7 +155,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusServiceUnavailable, nil)
 	server := mockServer.startMockServer(t)
 
-	suggester := NewSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Error(err)
@@ -158,7 +167,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 
 func TestFalconSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
-	suggester := NewSuggester(":/", "/content/suggest", http.DefaultClient)
+	suggester := NewFalconSuggester(":/", "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Nil(suggestionResp.Suggestions)
@@ -171,7 +180,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
-	suggester := NewSuggester("http://test-url", "/content/suggest", mockClient)
+	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Nil(suggestionResp.Suggestions)
@@ -189,7 +198,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	mockBody.On("Read", mock.AnythingOfType("[]uint8")).Return(0, errors.New("Read error"))
 	mockBody.On("Close").Return(nil)
 
-	suggester := NewSuggester("http://test-url", "/content/suggest", mockClient)
+	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Nil(suggestionResp.Suggestions)
@@ -205,7 +214,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte{})
 	server := mockServer.startMockServer(t)
 
-	suggester := NewSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Error(err)
@@ -221,7 +230,7 @@ func TestFalconSuggester_CheckHealth(t *testing.T) {
 	mockServer.On("GTG").Return(200)
 	server := mockServer.startMockServer(t)
 
-	suggester := NewSuggester(server.URL, "/__gtg", http.DefaultClient)
+	suggester := NewFalconSuggester(server.URL, "/__gtg", http.DefaultClient)
 	check := suggester.Check()
 	checkResult, err := check.Checker()
 
@@ -242,7 +251,7 @@ func TestFalconSuggester_CheckHealthUnhealthy(t *testing.T) {
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
 
-	suggester := NewSuggester(server.URL, "/__gtg", http.DefaultClient)
+	suggester := NewFalconSuggester(server.URL, "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
@@ -254,7 +263,7 @@ func TestFalconSuggester_CheckHealthUnhealthy(t *testing.T) {
 func TestFalconSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
 
-	suggester := NewSuggester(":/", "/__gtg", http.DefaultClient)
+	suggester := NewFalconSuggester(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
@@ -267,11 +276,114 @@ func TestFalconSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
-	suggester := NewSuggester("http://test-url", "/__gtg", mockClient)
+	suggester := NewFalconSuggester("http://test-url", "/__gtg", mockClient)
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
 	assert.Equal(t, "Http Client err", err.Error())
 	expect.Empty(checkResult)
 	mockClient.AssertExpectations(t)
+}
+
+func TestAuthorsSuggester_CheckHealth(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockFalconSuggestionApiServer)
+	mockServer.On("GTG").Return(200)
+	server := mockServer.startMockServer(t)
+
+	suggester := NewAuthorsSuggester(server.URL, "/__gtg", http.DefaultClient)
+	check := suggester.Check()
+	checkResult, err := check.Checker()
+
+	expect.Equal("authors-suggestion-api", check.ID)
+	expect.Equal("Suggesting authors from Concept Search won't work", check.BusinessImpact)
+	expect.Equal("Authors Suggestion API Healthcheck", check.Name)
+	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
+	expect.Equal("Authors Suggestion API is not available", check.TechnicalSummary)
+	expect.Equal(uint8(2), check.Severity)
+	expect.NoError(err)
+	expect.Equal("Authors Suggestion API is healthy", checkResult)
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
+	expect := assert.New(t)
+	suggestionApi := new(mockSuggestionApi)
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
+	}}, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+	}}, nil).Once()
+
+	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+
+	expect.NoError(err)
+	expect.Len(response.Suggestions, 2)
+
+	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+	expect.Equal(response.Suggestions[1].Id, "falcon-suggestion-api")
+
+	suggestionApi.AssertExpectations(t)
+}
+
+func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testing.T) {
+	expect := assert.New(t)
+	suggestionApi := new(mockSuggestionApi)
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+	}}, nil).Once()
+
+	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+
+	expect.NoError(err)
+	expect.Len(response.Suggestions, 1)
+
+	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+
+	suggestionApi.AssertExpectations(t)
+}
+
+func TestAggregateSuggester_GetSuggestionsNoErrorForAuthorsSuggestionApi(t *testing.T) {
+	expect := assert.New(t)
+	suggestionApi := new(mockSuggestionApi)
+
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+		{Predicate: "predicate", IsFTAuthor: true, Id: "falcon-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+	}}, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Authors err")).Once()
+
+	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+
+	expect.NoError(err)
+	expect.Len(response.Suggestions, 1)
+
+	expect.Equal(response.Suggestions[0].Id, "falcon-suggestion-api")
+
+	suggestionApi.AssertExpectations(t)
+}
+
+func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testing.T) {
+	expect := assert.New(t)
+	suggestionApi := new(mockSuggestionApi)
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+		{Predicate: hasAuthor, IsFTAuthor: true, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
+	}}, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+		{Predicate: hasAuthor, IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+	}}, nil).Once()
+
+	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+
+	expect.NoError(err)
+	expect.Len(response.Suggestions, 1)
+
+	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+
+	suggestionApi.AssertExpectations(t)
 }

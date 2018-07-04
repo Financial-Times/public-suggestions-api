@@ -328,6 +328,21 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	suggestionApi.AssertExpectations(t)
 }
 
+func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvailable(t *testing.T) {
+	expect := assert.New(t)
+	suggestionApi := new(mockSuggestionApi)
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
+
+	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+
+	expect.NoError(err)
+	expect.Len(response.Suggestions, 0)
+	expect.NotNil(response.Suggestions)
+
+	suggestionApi.AssertExpectations(t)
+}
+
 func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)

@@ -109,8 +109,12 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string) 
 		}
 		fResp.Suggestions = fResp.Suggestions[:i]
 	}
-	//merge results
-	var resp SuggestionsResponse
+	// merge results
+	// return empty slice by default instead of nil/null suggestions response
+	var resp = SuggestionsResponse{
+		Suggestions:make([]Suggestion, 0, len(aResp.Suggestions) + len(fResp.Suggestions)),
+	}
+
 	resp.Suggestions = append(resp.Suggestions, aResp.Suggestions...)
 	resp.Suggestions = append(resp.Suggestions, fResp.Suggestions...)
 	//no error should be returned, so clients could get always status OK

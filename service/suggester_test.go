@@ -317,9 +317,8 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
 
-	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
 
 	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
@@ -334,9 +333,8 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
 
-	expect.NoError(err)
 	expect.Len(response.Suggestions, 0)
 	expect.NotNil(response.Suggestions)
 
@@ -352,9 +350,8 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
 
-	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
 	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
@@ -372,9 +369,8 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForAuthorsSuggestionApi(t *test
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Authors err")).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{TmeSource})
 
-	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
 	expect.Equal(response.Suggestions[0].Id, "falcon-suggestion-api")
@@ -393,9 +389,8 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
 
-	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
 	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")

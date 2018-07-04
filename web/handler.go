@@ -11,7 +11,7 @@ import (
 	"errors"
 
 	log "github.com/Financial-Times/go-logger"
-	"github.com/golang/go/src/pkg/fmt"
+	"fmt"
 	"github.com/Financial-Times/public-suggestions-api/web/util"
 )
 

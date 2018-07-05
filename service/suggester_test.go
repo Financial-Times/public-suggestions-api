@@ -359,14 +359,13 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	suggestionApi.AssertExpectations(t)
 }
 
-func TestAggregateSuggester_GetSuggestionsNoErrorForAuthorsSuggestionApi(t *testing.T) {
+func TestAggregateSuggester_GetSuggestionsNoCallForAuthorsSuggestionApi(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: true, Id: "falcon-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}, nil).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Authors err")).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
 	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{TmeSource})

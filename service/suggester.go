@@ -95,15 +95,17 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
 		}
 	}
-	authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(payload, tid)
-	if err != nil {
-		if err == NoContentError {
-			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
-		} else {
-			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
+	var authorsResp SuggestionsResponse
+	if flags.AuthorsFlag != TmeSource {
+		authorsResp, err = suggester.AuthorsSuggester.GetSuggestions(payload, tid)
+		if err != nil {
+			if err == NoContentError {
+				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
+			} else {
+				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
+			}
 		}
 	}
-
 	if flags.AuthorsFlag != TmeSource {
 		falconResp.Suggestions = filterOutAuthors(falconResp)
 	}

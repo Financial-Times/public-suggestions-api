@@ -20,6 +20,7 @@ const (
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
+var BadRequestError = errors.New("Suggestion API returned HTTP 400")
 
 type Client interface {
 	Do(req *http.Request) (resp *http.Response, err error)
@@ -89,7 +90,7 @@ func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) *Aggrega
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
 	falconResp, err := suggester.FalconSuggester.GetSuggestions(payload, tid)
 	if err != nil {
-		if err == NoContentError {
+		if err == NoContentError || err == BadRequestError {
 			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
 		} else {
 			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
@@ -105,7 +106,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	case UppSource:
 		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(payload, tid)
 		if err != nil {
-			if err == NoContentError {
+			if err == NoContentError || err == BadRequestError {
 				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
 			} else {
 				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
@@ -172,6 +173,9 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (Sugg
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNoContent {
 			return SuggestionsResponse{make([]Suggestion, 0)}, NoContentError
+		}
+		if resp.StatusCode == http.StatusBadRequest {
+			return SuggestionsResponse{make([]Suggestion, 0)}, BadRequestError
 		}
 		return SuggestionsResponse{}, fmt.Errorf("%v returned HTTP %v", suggester.name, resp.StatusCode)
 	}

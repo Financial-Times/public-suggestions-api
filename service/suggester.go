@@ -15,8 +15,8 @@ import (
 const (
 	personType = "http://www.ft.com/ontology/person/Person"
 	hasAuthor  = "http://www.ft.com/ontology/annotation/hasAuthor"
-	TmeSource = "tme"
-	UppSource = "upp"
+	TmeSource  = "tme"
+	UppSource  = "upp"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
@@ -95,9 +95,15 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
 		}
 	}
-	var authorsResp SuggestionsResponse
-	if flags.AuthorsFlag != TmeSource {
-		authorsResp, err = suggester.AuthorsSuggester.GetSuggestions(payload, tid)
+	
+	switch flags.AuthorsFlag {
+	case TmeSource:
+		if falconResp.Suggestions == nil {
+			falconResp.Suggestions = make([]Suggestion, 0)
+		}
+		return falconResp
+	case UppSource:
+		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(payload, tid)
 		if err != nil {
 			if err == NoContentError {
 				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
@@ -105,22 +111,24 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
 			}
 		}
-	}
-	if flags.AuthorsFlag != TmeSource {
-		falconResp.Suggestions = filterOutAuthors(falconResp)
-	}
 
-	// return empty slice by default instead of nil/null suggestions response
-	var resp = SuggestionsResponse{
-		Suggestions: make([]Suggestion, 0, len(authorsResp.Suggestions)+len(falconResp.Suggestions)),
-	}
-	
-	// merge results
-	if flags.AuthorsFlag != TmeSource {
+		falconResp.Suggestions = filterOutAuthors(falconResp)
+
+		// return empty slice by default instead of nil/null suggestions response
+		var resp = SuggestionsResponse{
+			Suggestions: make([]Suggestion, 0, len(authorsResp.Suggestions)+len(falconResp.Suggestions)),
+		}
+
+		// merge results
 		resp.Suggestions = append(resp.Suggestions, authorsResp.Suggestions...)
+		resp.Suggestions = append(resp.Suggestions, falconResp.Suggestions...)
+		return resp
+	default:
+		log.WithTransactionID(tid).Error("Invalid authors flag")
+		return SuggestionsResponse{
+			Suggestions: make([]Suggestion, 0),
+		}
 	}
-	resp.Suggestions = append(resp.Suggestions, falconResp.Suggestions...)
-	return resp
 }
 
 func filterOutAuthors(resp SuggestionsResponse) []Suggestion {

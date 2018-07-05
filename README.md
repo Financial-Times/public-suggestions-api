@@ -35,7 +35,8 @@ Options:
       --port                             Port to listen on (env $APP_PORT) (default "9090")
       --falcon-suggestion-api-base-url   The base URL to falcon suggestion api (env $FALCON_SUGGESTION_API_BASE_URL) (default "http://localhost:8080")
       --falcon-suggestion-endpoint       The endpoint for falcon suggestion api (env $FALCON_SUGGESTION_ENDPOINT) (default "/content/suggest/falcon")
-        
+      --authors-suggestion-api-base-url   The base URL to authors suggestion api (env $AUTHORS_SUGGESTION_API_BASE_URL) (default "http://authors-suggestion-api:8080")
+      --authors-suggestion-endpoint       The endpoint for authors suggestion api (env $AUTHORS_SUGGESTION_ENDPOINT) (default "/content/suggest/authors")
 3. Test:
 
     1. Either using curl:

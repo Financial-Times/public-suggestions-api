@@ -15,6 +15,8 @@ import (
 const (
 	personType = "http://www.ft.com/ontology/person/Person"
 	hasAuthor  = "http://www.ft.com/ontology/annotation/hasAuthor"
+	TmeSource  = "tme"
+	UppSource  = "upp"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
@@ -54,6 +56,10 @@ type Suggestion struct {
 	IsFTAuthor     bool   `json:"isFTAuthor,omitempty"`
 }
 
+type SourceFlags struct {
+	AuthorsFlag string
+}
+
 func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *SuggestionApi {
 	return &SuggestionApi{
 		apiBaseURL:         falconSuggestionApiBaseURL,
@@ -76,12 +82,12 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 	}
 }
 
-func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) Suggester {
+func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) *AggregateSuggester {
 	return &AggregateSuggester{FalconSuggester: falconSuggester, AuthorsSuggester: authorsSuggester}
 }
 
-func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
-	fResp, err := suggester.FalconSuggester.GetSuggestions(payload, tid)
+func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
+	falconResp, err := suggester.FalconSuggester.GetSuggestions(payload, tid)
 	if err != nil {
 		if err == NoContentError {
 			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
@@ -89,36 +95,52 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string) 
 			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
 		}
 	}
-	aResp, err := suggester.AuthorsSuggester.GetSuggestions(payload, tid)
-	if err != nil {
-		if err == NoContentError {
-			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
-		} else {
-			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
+	
+	switch flags.AuthorsFlag {
+	case TmeSource:
+		if falconResp.Suggestions == nil {
+			falconResp.Suggestions = make([]Suggestion, 0)
 		}
-	}
-	//filter out authors response from falcon response if there is an authors response
-	if len(aResp.Suggestions) > 0 {
-		i := 0
-		for _, value := range fResp.Suggestions {
-			if isNotAuthor(value) {
-				//retain suggestion from falcon response
-				fResp.Suggestions[i] = value
-				i++
+		return falconResp
+	case UppSource:
+		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(payload, tid)
+		if err != nil {
+			if err == NoContentError {
+				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
+			} else {
+				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
 			}
 		}
-		fResp.Suggestions = fResp.Suggestions[:i]
-	}
-	// merge results
-	// return empty slice by default instead of nil/null suggestions response
-	var resp = SuggestionsResponse{
-		Suggestions:make([]Suggestion, 0, len(aResp.Suggestions) + len(fResp.Suggestions)),
-	}
 
-	resp.Suggestions = append(resp.Suggestions, aResp.Suggestions...)
-	resp.Suggestions = append(resp.Suggestions, fResp.Suggestions...)
-	//no error should be returned, so clients could get always status OK
-	return resp, nil
+		falconResp.Suggestions = filterOutAuthors(falconResp)
+
+		// return empty slice by default instead of nil/null suggestions response
+		var resp = SuggestionsResponse{
+			Suggestions: make([]Suggestion, 0, len(authorsResp.Suggestions)+len(falconResp.Suggestions)),
+		}
+
+		// merge results
+		resp.Suggestions = append(resp.Suggestions, authorsResp.Suggestions...)
+		resp.Suggestions = append(resp.Suggestions, falconResp.Suggestions...)
+		return resp
+	default:
+		log.WithTransactionID(tid).Error("Invalid authors flag")
+		return SuggestionsResponse{
+			Suggestions: make([]Suggestion, 0),
+		}
+	}
+}
+
+func filterOutAuthors(resp SuggestionsResponse) []Suggestion {
+	i := 0
+	for _, value := range resp.Suggestions {
+		if isNotAuthor(value) {
+			//retain suggestion
+			resp.Suggestions[i] = value
+			i++
+		}
+	}
+	return resp.Suggestions[:i]
 }
 
 func isNotAuthor(value Suggestion) bool {

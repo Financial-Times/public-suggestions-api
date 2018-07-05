@@ -11,13 +11,15 @@ import (
 	"errors"
 
 	log "github.com/Financial-Times/go-logger"
+	"fmt"
+	"github.com/Financial-Times/public-suggestions-api/web/util"
 )
 
 type RequestHandler struct {
-	Suggester service.Suggester
+	Suggester *service.AggregateSuggester
 }
 
-func NewRequestHandler(s service.Suggester) *RequestHandler {
+func NewRequestHandler(s *service.AggregateSuggester) *RequestHandler {
 	return &RequestHandler{Suggester: s}
 }
 
@@ -39,8 +41,18 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	//ignoring error as the aggregate suggester should not return any error
-	suggestions, _ := handler.Suggester.GetSuggestions(body, tid)
+	authorsFlag, found, err := util.GetSingleValueQueryParameter(request, "authors", service.TmeSource, service.UppSource)
+	if err != nil {
+		errMsg := "authors flag incorrectly set"
+		log.WithTransactionID(tid).WithError(err).Error(errMsg)
+		writeResponse(writer, http.StatusBadRequest, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
+		return
+	}
+	if !found {
+		authorsFlag = service.UppSource
+	}
+
+	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{AuthorsFlag: authorsFlag})
 	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}

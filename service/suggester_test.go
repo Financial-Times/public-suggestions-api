@@ -45,7 +45,7 @@ type mockSuggestionApi struct {
 	mock.Mock
 }
 
-func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
 	args := m.Called(payload, tid)
 	return args.Get(0).(SuggestionsResponse), args.Error(1)
 }
@@ -136,7 +136,7 @@ func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test")
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{AuthorsFlag: TmeSource})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -156,7 +156,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
 
 	expect.Error(err)
 	expect.Equal("Falcon Suggestion API returned HTTP 503", err.Error())
@@ -168,7 +168,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 func TestFalconSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
 	suggester := NewFalconSuggester(":/", "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -181,7 +181,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -199,7 +199,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	mockBody.On("Close").Return(nil)
 
 	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -215,7 +215,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
 
 	expect.Error(err)
 	expect.Equal("unexpected end of JSON input", err.Error())
@@ -321,8 +321,8 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	expect.Len(response.Suggestions, 2)
 
-	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
-	expect.Equal(response.Suggestions[1].Id, "falcon-suggestion-api")
+	expect.Equal(response.Suggestions[0].Id, "falcon-suggestion-api")
+	expect.Equal(response.Suggestions[1].Id, "authors-suggestion-api")
 
 	suggestionApi.AssertExpectations(t)
 }

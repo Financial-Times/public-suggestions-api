@@ -133,7 +133,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 			if err == NoContentError || err == BadRequestError {
 				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
 			} else {
-				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Delegate Suggestions API")
+				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Errorf("Error calling %v", suggesterDelegate.GetName())
 			}
 		}
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, resp.Suggestions...)
@@ -163,17 +163,10 @@ func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, fla
 	if err != nil {
 		return suggestions, err
 	}
-	if flags.AuthorsFlag == UppSource {
+	if flags.hasFlag(AuthorsSource) {
 		suggestions.Suggestions = filterOutAuthors(suggestions)
 	}
 	return suggestions, err
-}
-
-func (suggester *AuthorsSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
-	if flags.AuthorsFlag == UppSource {
-		return suggester.SuggestionApi.GetSuggestions(payload, tid, flags)
-	}
-	return SuggestionsResponse{Suggestions: make([]Suggestion, 0)}, nil
 }
 
 func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
@@ -218,6 +211,10 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags
 		return SuggestionsResponse{}, err
 	}
 	return response, nil
+}
+
+func (suggester *SuggestionApi) GetName() string {
+	return suggester.name
 }
 
 func (suggester *SuggestionApi) Check() health.Check {

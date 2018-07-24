@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	personType = "http://www.ft.com/ontology/person/Person"
-	hasAuthor  = "http://www.ft.com/ontology/annotation/hasAuthor"
-	TmeSource  = "tme"
-	UppSource  = "upp"
+	personType    = "http://www.ft.com/ontology/person/Person"
+	hasAuthor     = "http://www.ft.com/ontology/annotation/hasAuthor"
+	TmeSource     = "tme"
+	AuthorsSource = "authors"
+	CESSource     = "ces"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
@@ -28,6 +29,7 @@ type Client interface {
 
 type Suggester interface {
 	GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error)
+	GetName() string
 }
 
 type AggregateSuggester struct {
@@ -36,6 +38,7 @@ type AggregateSuggester struct {
 
 type SuggestionApi struct {
 	name               string
+	flag               string
 	apiBaseURL         string
 	suggestionEndpoint string
 	client             Client
@@ -48,6 +51,10 @@ type FalconSuggester struct {
 }
 
 type AuthorsSuggester struct {
+	SuggestionApi
+}
+
+type PeopleAndOrgsSuggester struct {
 	SuggestionApi
 }
 
@@ -65,7 +72,16 @@ type Suggestion struct {
 }
 
 type SourceFlags struct {
-	AuthorsFlag string
+	Flags []string
+}
+
+func (sourceFlags *SourceFlags) hasFlag(value string) bool {
+	for _, flag := range sourceFlags.Flags {
+		if flag == value {
+			return true
+		}
+	}
+	return false
 }
 
 func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *FalconSuggester {
@@ -74,6 +90,7 @@ func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint str
 		suggestionEndpoint: falconSuggestionEndpoint,
 		client:             client,
 		name:               "Falcon Suggestion API",
+		flag:               TmeSource,
 		systemId:           "falcon-suggestion-api",
 		failureImpact:      "Suggestions from TME won't work",
 	}}
@@ -85,8 +102,21 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 		suggestionEndpoint: authorsSuggestionEndpoint,
 		client:             client,
 		name:               "Authors Suggestion API",
+		flag:               AuthorsSource,
 		systemId:           "authors-suggestion-api",
 		failureImpact:      "Suggesting authors from Concept Search won't work",
+	}}
+}
+
+func NewPeopleAndOrgsSuggester(CESApiBaseURL, CESEndpoint string, client Client) *PeopleAndOrgsSuggester {
+	return &PeopleAndOrgsSuggester{SuggestionApi{
+		apiBaseURL:         CESApiBaseURL,
+		suggestionEndpoint: CESEndpoint,
+		client:             client,
+		name:               "CES API",
+		flag:               CESSource,
+		systemId:           "ces-api",
+		failureImpact:      "Suggesting people and orgs rom CES won't work",
 	}}
 }
 
@@ -147,6 +177,10 @@ func (suggester *AuthorsSuggester) GetSuggestions(payload []byte, tid string, fl
 }
 
 func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+	if !flags.hasFlag(suggester.flag) {
+		return SuggestionsResponse{make([]Suggestion, 0)}, nil
+	}
+
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
 		return SuggestionsResponse{}, err

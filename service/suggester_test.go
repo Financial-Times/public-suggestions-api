@@ -23,7 +23,7 @@ const sampleJSONResponse = `{
             "isFTAuthor": false
         },
         {
-            "predicate": "http://www.ft.com/ontology/annotation/mentions",
+            "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
             "id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
             "apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
             "prefLabel": "Lawrence Summers",
@@ -45,10 +45,13 @@ type mockSuggestionApi struct {
 	mock.Mock
 }
 
-
 func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
 	args := m.Called(payload, tid)
 	return args.Get(0).(SuggestionsResponse), args.Error(1)
+}
+
+func (m *mockSuggestionApi) GetName() string {
+	return "Mock Suggestion API"
 }
 
 type mockSuggestionApiServer struct {
@@ -121,7 +124,7 @@ func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 			IsFTAuthor:     false,
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
+			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
 			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
 			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
 			PrefLabel:      "Lawrence Summers",
@@ -137,7 +140,7 @@ func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{AuthorsFlag: TmeSource})
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -157,7 +160,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	expect.Error(err)
 	expect.Equal("Falcon Suggestion API returned HTTP 503", err.Error())
@@ -169,7 +172,7 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 func TestFalconSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
 	suggester := NewFalconSuggester(":/", "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -182,7 +185,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -200,7 +203,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	mockBody.On("Close").Return(nil)
 
 	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -216,7 +219,7 @@ func TestFalconSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{AuthorsFlag: TmeSource})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	expect.Error(err)
 	expect.Equal("unexpected end of JSON input", err.Error())
@@ -318,7 +321,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
 
@@ -334,7 +337,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 0)
 	expect.NotNil(response.Suggestions)
@@ -351,7 +354,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	}}, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{UppSource})
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 1)
 
@@ -363,7 +366,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 func TestGetSuggestions_NoResultsForAuthorsTmeSourceFlag(t *testing.T) {
 	expect := assert.New(t)
 	suggester := AuthorsSuggester{}
-	response, _ := suggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{TmeSource})
+	response, _ := suggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{TmeSource}})
 
 	expect.Equal(response.Suggestions, []Suggestion{})
 }
@@ -381,7 +384,7 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 			IsFTAuthor:     false,
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
+			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
 			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
 			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
 			PrefLabel:      "Lawrence Summers",
@@ -397,7 +400,7 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	server := mockServer.startMockServer(t)
 
 	suggester := NewAuthorsSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{AuthorsFlag: UppSource})
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -411,43 +414,35 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 }
 
 func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testing.T) {
-		expect := assert.New(t)
-	
-		expectedSuggestions := []Suggestion{
-			{
-				Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-				Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-				ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-				PrefLabel:      "Donald Kaberuka",
-				SuggestionType: "http://www.ft.com/ontology/person/Person",
-				IsFTAuthor:     false,
-			},
-			{
-				Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-				Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-				ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-				PrefLabel:      "Lawrence Summers",
-				SuggestionType: "http://www.ft.com/ontology/person/Person",
-				IsFTAuthor:     true,
-			},
-		}
-	
-		body, err := json.Marshal(&expectedSuggestions)
-		expect.NoError(err)
-		mockServer := new(mockSuggestionApiServer)
-		mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
-		server := mockServer.startMockServer(t)
-	
-		suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-		suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{AuthorsFlag: UppSource})
-	
-		actualSuggestions := suggestionResp.Suggestions
-		expect.NoError(err)
-		expect.NotNil(actualSuggestions)
-		expect.True(len(actualSuggestions) == len(expectedSuggestions))
-	
-		for _, expected := range expectedSuggestions {
-			expect.Contains(actualSuggestions, expected)
-		}
-		mock.AssertExpectationsForObjects(t, mockServer)
+	expect := assert.New(t)
+
+	expectedSuggestions := []Suggestion{
+		{
+			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
+			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+			PrefLabel:      "Donald Kaberuka",
+			SuggestionType: "http://www.ft.com/ontology/person/Person",
+			IsFTAuthor:     false,
+		},
+	}
+
+	body, err := json.Marshal(&expectedSuggestions)
+	expect.NoError(err)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
+	server := mockServer.startMockServer(t)
+
+	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: []string{TmeSource, AuthorsSource}})
+
+	actualSuggestions := suggestionResp.Suggestions
+	expect.NoError(err)
+	expect.NotNil(actualSuggestions)
+	expect.Equal(1, len(actualSuggestions))
+
+	for _, expected := range expectedSuggestions {
+		expect.Contains(actualSuggestions, expected)
+	}
+	mock.AssertExpectationsForObjects(t, mockServer)
 }

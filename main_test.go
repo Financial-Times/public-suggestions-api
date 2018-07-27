@@ -8,7 +8,14 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/public-suggestions-api/service"
+	"github.com/Financial-Times/public-suggestions-api/web"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"net"
+	"net/http/httptest"
+	"strings"
 )
 
 func TestMainApp(t *testing.T) {
@@ -59,4 +66,165 @@ func TestMainApp(t *testing.T) {
 			testCase.assertResponse(resp)
 		}
 	}
+}
+
+func TestRequestHandler_all(t *testing.T) {
+
+	expectedSuggestions := []service.Suggestion{
+		{
+			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
+			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+			PrefLabel:      "Donald Kaberuka",
+			SuggestionType: "http://www.ft.com/ontology/person/Person",
+			IsFTAuthor:     false,
+		},
+		{
+			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
+			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+			PrefLabel:      "Lawrence Summers",
+			SuggestionType: "http://www.ft.com/ontology/person/Person",
+			IsFTAuthor:     true,
+		},
+		{
+			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
+			Id:             "http://api.ft.com/things/eadc5df0-9838-3971-920e-47beed423b4c",
+			ApiUrl:         "http://api.ft.com/people/eadc5df0-9838-3971-920e-47beed423b4c",
+			PrefLabel:      "Huw van Steenis",
+			SuggestionType: "http://www.ft.com/ontology/person/Person",
+		},
+		{
+			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
+			Id:             "http://api.ft.com/things/e3f5393f-15b7-361f-9d02-826616b1fc66",
+			ApiUrl:         "http://api.ft.com/organisations/e3f5393f-15b7-361f-9d02-826616b1fc66",
+			PrefLabel:      "Harvard University",
+			SuggestionType: "http://www.ft.com/ontology/organisation/Organisation",
+		},
+	}
+	tests := []struct {
+		url                 string
+		expectedStatus      int
+		expectedSuggestions []service.Suggestion
+	}{
+		{url: "http://localhost:8080/content/suggest?source=tme&source=authors&source=ces", expectedStatus: http.StatusOK, expectedSuggestions: expectedSuggestions},
+		{url: "http://localhost:8080/content/suggest?source=tme", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+			expectedSuggestions[0],
+			expectedSuggestions[1],
+		}},
+		{url: "http://localhost:8080/content/suggest?source=authors", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+			expectedSuggestions[1],
+		}},
+		{url: "http://localhost:8080/content/suggest?source=ces", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+			expectedSuggestions[2],
+			expectedSuggestions[3],
+		}},
+		{url: "http://localhost:8080/content/suggest", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+			expectedSuggestions[0],
+			expectedSuggestions[1],
+		}},
+	}
+
+	log.InitDefaultLogger("test")
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		w.WriteHeader(status)
+		switch {
+		case strings.Contains(r.RequestURI, "/falcon"):
+			w.Write([]byte(`{
+    		"suggestions": [{
+    		        "predicate": "http://www.ft.com/ontology/annotation/mentions",
+    		        "id": "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+    		        "apiUrl": "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+    		        "prefLabel": "Donald Kaberuka",
+    		        "type": "http://www.ft.com/ontology/person/Person",
+    		        "isFTAuthor": false
+    		    },
+    		    {
+    		        "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
+    		        "id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+    		        "apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+    		        "prefLabel": "Lawrence Summers",
+    		        "type": "http://www.ft.com/ontology/person/Person",
+    		        "isFTAuthor": true
+    		    }
+    		]}`))
+
+		case strings.Contains(r.RequestURI, "/authors"):
+			w.Write([]byte(`{
+    		"suggestions": [
+    		    {
+    		        "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
+    		        "id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+    		        "apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+    		        "prefLabel": "Lawrence Summers",
+    		        "type": "http://www.ft.com/ontology/person/Person",
+    		        "isFTAuthor": true
+    		    }
+    		]}`))
+
+		case strings.Contains(r.RequestURI, "/ces"):
+			w.Write([]byte(`{
+                "suggestions": [
+                  {
+                    "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
+                    "id": "http://api.ft.com/things/eadc5df0-9838-3971-920e-47beed423b4c",
+                    "apiUrl": "http://api.ft.com/people/eadc5df0-9838-3971-920e-47beed423b4c",
+                    "prefLabel": "Huw van Steenis",
+                    "type": "http://www.ft.com/ontology/person/Person"
+                  },
+                  {
+                    "predicate": "http://www.ft.com/ontology/annotation/mentions",
+                    "id": "http://api.ft.com/things/e3f5393f-15b7-361f-9d02-826616b1fc66",
+                    "apiUrl": "http://api.ft.com/organisations/e3f5393f-15b7-361f-9d02-826616b1fc66",
+                    "prefLabel": "Harvard University",
+                    "type": "http://www.ft.com/ontology/organisation/Organisation"
+                  }
+                ]
+              }`))
+		}
+	}))
+
+	tr := &http.Transport{
+		MaxIdleConnsPerHost: 128,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+	}
+	c := &http.Client{
+		Transport: tr,
+		Timeout:   30 * time.Second,
+	}
+
+	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
+	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
+	peopleAndOrgsSuggester := service.NewPeopleAndOrgsSuggester(mockServer.URL, "/ces", c)
+	suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester, peopleAndOrgsSuggester)
+	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), peopleAndOrgsSuggester.Check())
+
+	go func() {
+		serveEndpoints("8080", web.NewRequestHandler(suggester), healthService)
+	}()
+
+	client := &http.Client{}
+
+	for _, test := range tests {
+
+		req, _ := http.NewRequest("POST", test.url, strings.NewReader(`{"body":"test"}`))
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+
+		assert.Equal(t, test.expectedStatus, res.StatusCode)
+		if test.expectedStatus == http.StatusOK {
+			rBody := make([]byte, res.ContentLength)
+			res.Body.Read(rBody)
+			res.Body.Close()
+
+			suggestionsResponse := service.SuggestionsResponse{}
+			json.Unmarshal(rBody, &suggestionsResponse)
+			assert.Equal(t, test.expectedSuggestions, suggestionsResponse.Suggestions)
+		}
+	}
+
 }

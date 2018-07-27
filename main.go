@@ -105,7 +105,7 @@ func main() {
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
 		peopleAndOrgsSuggester := service.NewPeopleAndOrgsSuggester(*CESBaseURL, *CESEndpoint, c)
 		suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester, peopleAndOrgsSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), peopleAndOrgsSuggester.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

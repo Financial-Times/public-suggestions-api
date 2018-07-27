@@ -39,6 +39,10 @@ func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags 
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
+func (s *mockSuggesterService) GetName() string {
+	return "Mock suggester service"
+}
+
 func (s *mockSuggesterService) Check() v1_1.Check {
 	args := s.Called()
 	return args.Get(0).(v1_1.Check)
@@ -54,8 +58,8 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{{PrefLabel: "TestMan"}}}
 	mockSuggester := new(mockSuggesterService)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{AuthorsFlag: "upp"}).Return(expectedResp, nil).Once()
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{AuthorsFlag: "upp"}).Return(service.SuggestionsResponse{}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(expectedResp, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{}, nil)
 
 	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
@@ -69,12 +73,12 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	expect := assert.New(t)
 
 	body := []byte(`{"bodyXml": "Test"}`)
-	req := httptest.NewRequest("POST", "/content/suggest?authors=tme", bytes.NewReader(body))
+	req := httptest.NewRequest("POST", "/content/suggest?source=tme", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{AuthorsFlag: "tme"}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{[]string{service.TmeSource}}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
 
 	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
@@ -146,7 +150,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{AuthorsFlag: "upp"}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
 	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
@@ -156,11 +160,11 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockSuggester.AssertExpectations(t)
 }
 
-func TestRequestHandler_HandleSuggestionErrorInvalidAuthorsParamOnGetSuggestions(t *testing.T) {
+func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
 
 	body := []byte(`{"bodyXml": "Test"}`)
-	req := httptest.NewRequest("POST", "/content/suggest?authors=invalid", bytes.NewReader(body))
+	req := httptest.NewRequest("POST", "/content/suggest?source=invalid", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
@@ -170,7 +174,7 @@ func TestRequestHandler_HandleSuggestionErrorInvalidAuthorsParamOnGetSuggestions
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
-	expect.Equal(`{"message": "authors flag incorrectly set"}`, w.Body.String())
+	expect.Equal(`{"message": "source flag incorrectly set"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t) //no calls
 }
 
@@ -184,7 +188,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 
 	mockSuggester := new(mockSuggesterService)
 	service.NoContentError = errors.New("No content error")
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{AuthorsFlag: "upp"}).Return(service.SuggestionsResponse{make([]service.Suggestion, 0)}, service.NoContentError)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{make([]service.Suggestion, 0)}, service.NoContentError)
 
 	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
@@ -204,7 +208,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{AuthorsFlag: "upp"}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
 	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)

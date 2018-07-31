@@ -13,49 +13,41 @@ import (
 )
 
 const (
-	personType    = "http://www.ft.com/ontology/person/Person"
-	hasAuthor     = "http://www.ft.com/ontology/annotation/hasAuthor"
-	TmeSource     = "tme"
-	AuthorsSource = "authors"
-	CESSource     = "ces"
+	personType = "http://www.ft.com/ontology/person/Person"
+	hasAuthor  = "http://www.ft.com/ontology/annotation/hasAuthor"
+	TmeSource  = "tme"
+	UppSource  = "upp"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
 var BadRequestError = errors.New("Suggestion API returned HTTP 400")
+
+type JsonInput struct {
+	Byline   string `json:"byline"`
+	Body     string `json:"bodyXML"`
+	Headline string `json:"title"`
+}
 
 type Client interface {
 	Do(req *http.Request) (resp *http.Response, err error)
 }
 
 type Suggester interface {
-	GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error)
-	GetName() string
+	GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error)
 }
 
 type AggregateSuggester struct {
-	Suggesters []Suggester
+	FalconSuggester  Suggester
+	AuthorsSuggester Suggester
 }
 
 type SuggestionApi struct {
 	name               string
-	flag               string
 	apiBaseURL         string
 	suggestionEndpoint string
 	client             Client
 	systemId           string
 	failureImpact      string
-}
-
-type FalconSuggester struct {
-	SuggestionApi
-}
-
-type AuthorsSuggester struct {
-	SuggestionApi
-}
-
-type PeopleAndOrgsSuggester struct {
-	SuggestionApi
 }
 
 type SuggestionsResponse struct {
@@ -72,74 +64,84 @@ type Suggestion struct {
 }
 
 type SourceFlags struct {
-	Flags []string
+	AuthorsFlag string
 }
 
-func (sourceFlags *SourceFlags) hasFlag(value string) bool {
-	for _, flag := range sourceFlags.Flags {
-		if flag == value {
-			return true
-		}
-	}
-	return false
-}
-
-func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *FalconSuggester {
-	return &FalconSuggester{SuggestionApi{
+func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *SuggestionApi {
+	return &SuggestionApi{
 		apiBaseURL:         falconSuggestionApiBaseURL,
 		suggestionEndpoint: falconSuggestionEndpoint,
 		client:             client,
 		name:               "Falcon Suggestion API",
-		flag:               TmeSource,
 		systemId:           "falcon-suggestion-api",
 		failureImpact:      "Suggestions from TME won't work",
-	}}
+	}
 }
 
-func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint string, client Client) *AuthorsSuggester {
-	return &AuthorsSuggester{SuggestionApi{
+func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint string, client Client) *SuggestionApi {
+	return &SuggestionApi{
 		apiBaseURL:         authorsSuggestionApiBaseURL,
 		suggestionEndpoint: authorsSuggestionEndpoint,
 		client:             client,
 		name:               "Authors Suggestion API",
-		flag:               AuthorsSource,
 		systemId:           "authors-suggestion-api",
 		failureImpact:      "Suggesting authors from Concept Search won't work",
-	}}
+	}
 }
 
-func NewPeopleAndOrgsSuggester(CESApiBaseURL, CESEndpoint string, client Client) *PeopleAndOrgsSuggester {
-	return &PeopleAndOrgsSuggester{SuggestionApi{
-		apiBaseURL:         CESApiBaseURL,
-		suggestionEndpoint: CESEndpoint,
-		client:             client,
-		name:               "CES API",
-		flag:               CESSource,
-		systemId:           "ces-api",
-		failureImpact:      "Suggesting people and orgs rom CES won't work",
-	}}
-}
-
-func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
-	return &AggregateSuggester{suggesters}
+func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) *AggregateSuggester {
+	return &AggregateSuggester{FalconSuggester: falconSuggester, AuthorsSuggester: authorsSuggester}
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
-	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
+	data, err := getXmlSuggestionRequestFromJson(payload)
+	fmt.Println(err)
+	if err != nil {
+		data = payload
+	}
 
-	for _, suggesterDelegate := range suggester.Suggesters {
-		resp, err := suggesterDelegate.GetSuggestions(payload, tid, flags)
+	falconResp, err := suggester.FalconSuggester.GetSuggestions(data, tid)
+	if err != nil {
+		if err == NoContentError || err == BadRequestError {
+			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
+		} else {
+			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
+		}
+	}
+
+	switch flags.AuthorsFlag {
+	case TmeSource:
+		if falconResp.Suggestions == nil {
+			falconResp.Suggestions = make([]Suggestion, 0)
+		}
+		return falconResp
+	case UppSource:
+		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(data, tid)
 		if err != nil {
 			if err == NoContentError || err == BadRequestError {
 				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
 			} else {
-				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Errorf("Error calling %v", suggesterDelegate.GetName())
+				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
 			}
 		}
-		aggregateResp.Suggestions = append(aggregateResp.Suggestions, resp.Suggestions...)
-	}
 
-	return aggregateResp
+		falconResp.Suggestions = filterOutAuthors(falconResp)
+
+		// return empty slice by default instead of nil/null suggestions response
+		var resp = SuggestionsResponse{
+			Suggestions: make([]Suggestion, 0, len(authorsResp.Suggestions)+len(falconResp.Suggestions)),
+		}
+
+		// merge results
+		resp.Suggestions = append(resp.Suggestions, authorsResp.Suggestions...)
+		resp.Suggestions = append(resp.Suggestions, falconResp.Suggestions...)
+		return resp
+	default:
+		log.WithTransactionID(tid).Error("Invalid authors flag")
+		return SuggestionsResponse{
+			Suggestions: make([]Suggestion, 0),
+		}
+	}
 }
 
 func filterOutAuthors(resp SuggestionsResponse) []Suggestion {
@@ -158,22 +160,7 @@ func isNotAuthor(value Suggestion) bool {
 	return !(value.SuggestionType == personType && value.Predicate == hasAuthor)
 }
 
-func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
-	suggestions, err := suggester.SuggestionApi.GetSuggestions(payload, tid, flags)
-	if err != nil {
-		return suggestions, err
-	}
-	if flags.hasFlag(AuthorsSource) {
-		suggestions.Suggestions = filterOutAuthors(suggestions)
-	}
-	return suggestions, err
-}
-
-func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
-	if !flags.hasFlag(suggester.flag) {
-		return SuggestionsResponse{make([]Suggestion, 0)}, nil
-	}
-
+func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
 		return SuggestionsResponse{}, err
@@ -213,10 +200,6 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags
 	return response, nil
 }
 
-func (suggester *SuggestionApi) GetName() string {
-	return suggester.name
-}
-
 func (suggester *SuggestionApi) Check() health.Check {
 	return health.Check{
 		ID:               suggester.systemId,
@@ -248,4 +231,47 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
 	}
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
+}
+func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
+
+	var jsonInput JsonInput
+
+	err := json.Unmarshal(jsonData, &jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonInput.Byline = TransformText(jsonInput.Byline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+		DefaultValueTransformer,
+	)
+	jsonInput.Body = TransformText(jsonInput.Body,
+		PullTagTransformer,
+		WebPullTagTransformer,
+		TableTagTransformer,
+		PromoBoxTagTransformer,
+		WebInlinePictureTagTransformer,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+		DefaultValueTransformer,
+	)
+	jsonInput.Headline = TransformText(jsonInput.Headline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+		DefaultValueTransformer,
+	)
+
+	data, err := json.Marshal(jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

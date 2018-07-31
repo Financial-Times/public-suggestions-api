@@ -11,6 +11,7 @@ import (
 	"errors"
 
 	"fmt"
+
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/web/util"
 )
@@ -41,18 +42,18 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	sourceFlags, found := util.GetMultipleValueQueryParameter(request, "source")
+	authorsFlag, found, err := util.GetSingleValueQueryParameter(request, "authors", service.TmeSource, service.UppSource)
 	if err != nil {
-		errMsg := "source flag incorrectly set"
+		errMsg := "authors flag incorrectly set"
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)
 		writeResponse(writer, http.StatusBadRequest, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
 		return
 	}
 	if !found {
-		sourceFlags = []string{service.TmeSource, service.AuthorsSource}
+		authorsFlag = service.UppSource
 	}
 
-	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: sourceFlags})
+	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{AuthorsFlag: authorsFlag})
 	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}

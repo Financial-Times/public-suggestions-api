@@ -41,7 +41,7 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	sourceFlags, found, err := util.GetMultipleValueQueryParameter(request, "source", service.TmeSource, service.AuthorsSource, service.CESSource)
+	sourceFlags, found, err := util.GetMultipleValueQueryParameter(request, "source", service.TmeSource, service.AuthorsSource)
 	if err != nil {
 		errMsg := "source flag incorrectly set"
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)

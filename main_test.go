@@ -87,37 +87,19 @@ func TestRequestHandler_all(t *testing.T) {
 			SuggestionType: "http://www.ft.com/ontology/person/Person",
 			IsFTAuthor:     true,
 		},
-		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://api.ft.com/things/eadc5df0-9838-3971-920e-47beed423b4c",
-			ApiUrl:         "http://api.ft.com/people/eadc5df0-9838-3971-920e-47beed423b4c",
-			PrefLabel:      "Huw van Steenis",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-		},
-		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://api.ft.com/things/e3f5393f-15b7-361f-9d02-826616b1fc66",
-			ApiUrl:         "http://api.ft.com/organisations/e3f5393f-15b7-361f-9d02-826616b1fc66",
-			PrefLabel:      "Harvard University",
-			SuggestionType: "http://www.ft.com/ontology/organisation/Organisation",
-		},
 	}
 	tests := []struct {
 		url                 string
 		expectedStatus      int
 		expectedSuggestions []service.Suggestion
 	}{
-		{url: "http://localhost:8080/content/suggest?source=tme&source=authors&source=ces", expectedStatus: http.StatusOK, expectedSuggestions: expectedSuggestions},
+		{url: "http://localhost:8080/content/suggest?source=tme&source=authors", expectedStatus: http.StatusOK, expectedSuggestions: expectedSuggestions},
 		{url: "http://localhost:8080/content/suggest?source=tme", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
 			expectedSuggestions[0],
 			expectedSuggestions[1],
 		}},
 		{url: "http://localhost:8080/content/suggest?source=authors", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
 			expectedSuggestions[1],
-		}},
-		{url: "http://localhost:8080/content/suggest?source=ces", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
-			expectedSuggestions[2],
-			expectedSuggestions[3],
 		}},
 		{url: "http://localhost:8080/content/suggest", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
 			expectedSuggestions[0],
@@ -162,26 +144,6 @@ func TestRequestHandler_all(t *testing.T) {
     		        "isFTAuthor": true
     		    }
     		]}`))
-
-		case strings.Contains(r.RequestURI, "/ces"):
-			w.Write([]byte(`{
-                "suggestions": [
-                  {
-                    "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
-                    "id": "http://api.ft.com/things/eadc5df0-9838-3971-920e-47beed423b4c",
-                    "apiUrl": "http://api.ft.com/people/eadc5df0-9838-3971-920e-47beed423b4c",
-                    "prefLabel": "Huw van Steenis",
-                    "type": "http://www.ft.com/ontology/person/Person"
-                  },
-                  {
-                    "predicate": "http://www.ft.com/ontology/annotation/mentions",
-                    "id": "http://api.ft.com/things/e3f5393f-15b7-361f-9d02-826616b1fc66",
-                    "apiUrl": "http://api.ft.com/organisations/e3f5393f-15b7-361f-9d02-826616b1fc66",
-                    "prefLabel": "Harvard University",
-                    "type": "http://www.ft.com/ontology/organisation/Organisation"
-                  }
-                ]
-              }`))
 		}
 	}))
 
@@ -199,9 +161,8 @@ func TestRequestHandler_all(t *testing.T) {
 
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
-	peopleAndOrgsSuggester := service.NewPeopleAndOrgsSuggester(mockServer.URL, "/ces", c)
-	suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester, peopleAndOrgsSuggester)
-	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), peopleAndOrgsSuggester.Check())
+	suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
+	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
 
 	go func() {
 		serveEndpoints("8080", web.NewRequestHandler(suggester), healthService)

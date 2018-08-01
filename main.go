@@ -71,18 +71,6 @@ func main() {
 		Desc:   "The endpoint for authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
-	CESBaseURL := app.String(cli.StringOpt{
-		Name:   "ces-api-base-url",
-		Value:  "http://ces:8080",
-		Desc:   "The base URL to CES",
-		EnvVar: "CES_BASE_URL",
-	})
-	CESEndpoint := app.String(cli.StringOpt{
-		Name:   "ces-endpoint",
-		Value:  "/content/suggest/",
-		Desc:   "The endpoint for people and orgs suggestion api",
-		EnvVar: "CES_ENDPOINT",
-	})
 
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
@@ -103,9 +91,8 @@ func main() {
 		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
-		peopleAndOrgsSuggester := service.NewPeopleAndOrgsSuggester(*CESBaseURL, *CESEndpoint, c)
-		suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester, peopleAndOrgsSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), peopleAndOrgsSuggester.Check())
+		suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

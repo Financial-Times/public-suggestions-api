@@ -17,7 +17,6 @@ const (
 	hasAuthor     = "http://www.ft.com/ontology/annotation/hasAuthor"
 	TmeSource     = "tme"
 	AuthorsSource = "authors"
-	CESSource     = "ces"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
@@ -51,10 +50,6 @@ type FalconSuggester struct {
 }
 
 type AuthorsSuggester struct {
-	SuggestionApi
-}
-
-type PeopleAndOrgsSuggester struct {
 	SuggestionApi
 }
 
@@ -105,18 +100,6 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 		flag:               AuthorsSource,
 		systemId:           "authors-suggestion-api",
 		failureImpact:      "Suggesting authors from Concept Search won't work",
-	}}
-}
-
-func NewPeopleAndOrgsSuggester(CESApiBaseURL, CESEndpoint string, client Client) *PeopleAndOrgsSuggester {
-	return &PeopleAndOrgsSuggester{SuggestionApi{
-		apiBaseURL:         CESApiBaseURL,
-		suggestionEndpoint: CESEndpoint,
-		client:             client,
-		name:               "CES API",
-		flag:               CESSource,
-		systemId:           "ces-api",
-		failureImpact:      "Suggesting people and orgs rom CES won't work",
 	}}
 }
 

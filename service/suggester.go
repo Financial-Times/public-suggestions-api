@@ -23,9 +23,9 @@ var NoContentError = errors.New("Suggestion API returned HTTP 204")
 var BadRequestError = errors.New("Suggestion API returned HTTP 400")
 
 type JsonInput struct {
-	Byline   string `json:"byline"`
+	Byline   string `json:"byline,omitempty"`
 	Body     string `json:"bodyXML"`
-	Headline string `json:"title"`
+	Headline string `json:"title,omitempty"`
 }
 
 type Client interface {
@@ -246,7 +246,6 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 		TagsRemover,
 		OuterSpaceTrimmer,
 		DuplicateWhiteSpaceRemover,
-		DefaultValueTransformer,
 	)
 	jsonInput.Body = TransformText(jsonInput.Body,
 		PullTagTransformer,
@@ -258,14 +257,12 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 		TagsRemover,
 		OuterSpaceTrimmer,
 		DuplicateWhiteSpaceRemover,
-		DefaultValueTransformer,
 	)
 	jsonInput.Headline = TransformText(jsonInput.Headline,
 		HtmlEntityTransformer,
 		TagsRemover,
 		OuterSpaceTrimmer,
 		DuplicateWhiteSpaceRemover,
-		DefaultValueTransformer,
 	)
 
 	data, err := json.Marshal(jsonInput)

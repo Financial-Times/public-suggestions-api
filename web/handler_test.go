@@ -198,7 +198,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	expect := assert.New(t)
 
-	body := []byte(`{"bodyXML":"Test body"}`)
+	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()

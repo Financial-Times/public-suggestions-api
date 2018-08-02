@@ -93,15 +93,15 @@ func TestRequestHandler_all(t *testing.T) {
 		expectedStatus      int
 		expectedSuggestions []service.Suggestion
 	}{
-		{url: "http://localhost:8080/content/suggest?source=tme&source=authors", expectedStatus: http.StatusOK, expectedSuggestions: expectedSuggestions},
-		{url: "http://localhost:8080/content/suggest?source=tme", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+		{url: "http://localhost:8081/content/suggest?source=tme&source=authors", expectedStatus: http.StatusOK, expectedSuggestions: expectedSuggestions},
+		{url: "http://localhost:8081/content/suggest?source=tme", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
 			expectedSuggestions[0],
 			expectedSuggestions[1],
 		}},
-		{url: "http://localhost:8080/content/suggest?source=authors", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+		{url: "http://localhost:8081/content/suggest?source=authors", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
 			expectedSuggestions[1],
 		}},
-		{url: "http://localhost:8080/content/suggest", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
+		{url: "http://localhost:8081/content/suggest", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
 			expectedSuggestions[0],
 			expectedSuggestions[1],
 		}},
@@ -165,7 +165,7 @@ func TestRequestHandler_all(t *testing.T) {
 	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
 
 	go func() {
-		serveEndpoints("8080", web.NewRequestHandler(suggester), healthService)
+		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
 	}()
 
 	client := &http.Client{}

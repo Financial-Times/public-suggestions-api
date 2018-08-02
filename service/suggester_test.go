@@ -313,20 +313,22 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
-	}}, nil).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
+	}}
+	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
-	}}, nil).Once()
+	}}
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 
 	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
 	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
 
-	expect.Equal(response.Suggestions[0].Id, "falcon-suggestion-api")
-	expect.Equal(response.Suggestions[1].Id, "authors-suggestion-api")
+	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
+	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
 	suggestionApi.AssertExpectations(t)
 }

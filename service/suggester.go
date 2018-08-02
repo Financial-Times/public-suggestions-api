@@ -10,6 +10,7 @@ import (
 
 	health "github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
+	"sync"
 )
 
 const (
@@ -110,16 +111,31 @@ func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 
-	for _, suggesterDelegate := range suggester.Suggesters {
-		resp, err := suggesterDelegate.GetSuggestions(payload, tid, flags)
-		if err != nil {
-			if err == NoContentError || err == BadRequestError {
-				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
-			} else {
-				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Errorf("Error calling %v", suggesterDelegate.GetName())
+	var mutex = sync.Mutex{}
+	var wg = sync.WaitGroup{}
+
+	var responseMap = map[int][]Suggestion{}
+	for key, suggesterDelegate := range suggester.Suggesters {
+		wg.Add(1)
+		go func(i int, delegate Suggester) {
+			resp, err := delegate.GetSuggestions(payload, tid, flags)
+			if err != nil {
+				if err == NoContentError || err == BadRequestError {
+					log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
+				} else {
+					log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Errorf("Error calling %v", delegate.GetName())
+				}
 			}
-		}
-		aggregateResp.Suggestions = append(aggregateResp.Suggestions, resp.Suggestions...)
+			mutex.Lock()
+			responseMap[i] = resp.Suggestions
+			mutex.Unlock()
+			wg.Done()
+		}(key, suggesterDelegate)
+	}
+	wg.Wait()
+	// preserve results order
+	for i := 0; i < len(suggester.Suggesters); i++ {
+		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
 	}
 
 	return aggregateResp

@@ -95,7 +95,6 @@ func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) *Aggrega
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
 	data, err := getXmlSuggestionRequestFromJson(payload)
-	fmt.Println(err)
 	if err != nil {
 		data = payload
 	}

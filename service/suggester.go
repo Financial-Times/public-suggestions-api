@@ -22,6 +22,12 @@ const (
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
 var BadRequestError = errors.New("Suggestion API returned HTTP 400")
 
+type JsonInput struct {
+	Byline   string `json:"byline,omitempty"`
+	Body     string `json:"bodyXML"`
+	Headline string `json:"title,omitempty"`
+}
+
 type Client interface {
 	Do(req *http.Request) (resp *http.Response, err error)
 }
@@ -88,7 +94,12 @@ func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) *Aggrega
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
-	falconResp, err := suggester.FalconSuggester.GetSuggestions(payload, tid)
+	data, err := getXmlSuggestionRequestFromJson(payload)
+	if err != nil {
+		data = payload
+	}
+
+	falconResp, err := suggester.FalconSuggester.GetSuggestions(data, tid)
 	if err != nil {
 		if err == NoContentError || err == BadRequestError {
 			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
@@ -96,7 +107,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
 		}
 	}
-	
+
 	switch flags.AuthorsFlag {
 	case TmeSource:
 		if falconResp.Suggestions == nil {
@@ -104,7 +115,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		}
 		return falconResp
 	case UppSource:
-		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(payload, tid)
+		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(data, tid)
 		if err != nil {
 			if err == NoContentError || err == BadRequestError {
 				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
@@ -219,4 +230,44 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
 	}
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
+}
+func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
+
+	var jsonInput JsonInput
+
+	err := json.Unmarshal(jsonData, &jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonInput.Byline = TransformText(jsonInput.Byline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Body = TransformText(jsonInput.Body,
+		PullTagTransformer,
+		WebPullTagTransformer,
+		TableTagTransformer,
+		PromoBoxTagTransformer,
+		WebInlinePictureTagTransformer,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Headline = TransformText(jsonInput.Headline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+
+	data, err := json.Marshal(jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

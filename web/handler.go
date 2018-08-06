@@ -10,8 +10,9 @@ import (
 
 	"errors"
 
-	log "github.com/Financial-Times/go-logger"
 	"fmt"
+
+	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/web/util"
 )
 

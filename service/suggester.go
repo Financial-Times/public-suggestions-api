@@ -77,6 +77,15 @@ type SourceFlags struct {
 	Flags []string
 }
 
+func (sourceFlags *SourceFlags) hasFlag(value string) bool {
+	for _, flag := range sourceFlags.Flags {
+		if flag == value {
+			return true
+		}
+	}
+	return false
+}
+
 func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *FalconSuggester {
 	return &FalconSuggester{SuggestionApi{
 		apiBaseURL:         falconSuggestionApiBaseURL,

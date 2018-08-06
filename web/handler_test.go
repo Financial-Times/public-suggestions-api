@@ -34,8 +34,8 @@ func (r *faultyReader) Close() error {
 	return nil
 }
 
-func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string) (service.SuggestionsResponse, error) {
-	args := s.Called(payload, tid)
+func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags service.SourceFlags) (service.SuggestionsResponse, error) {
+	args := s.Called(payload, tid, flags)
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
@@ -61,7 +61,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(expectedResp, nil).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{}, nil)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -72,7 +72,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T) {
 	expect := assert.New(t)
 
-	body := []byte(`{"bodyXml": "Test"}`)
+	body := []byte(`{"byline":"Test byline","bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest?source=tme", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
@@ -80,7 +80,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	mockSuggester := new(mockSuggesterService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{[]string{service.TmeSource}}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -97,7 +97,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 
 	mockSuggester := new(mockSuggesterService)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -115,7 +115,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 
 	mockSuggester := new(mockSuggesterService)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -133,7 +133,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 
 	mockSuggester := new(mockSuggesterService)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -152,7 +152,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockSuggester := new(mockSuggesterService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -163,14 +163,14 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
 
-	body := []byte(`{"bodyXml": "Test"}`)
+	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest?source=invalid", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -190,7 +190,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	service.NoContentError = errors.New("No content error")
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{make([]service.Suggestion, 0)}, service.NoContentError)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -210,7 +210,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	mockSuggester := new(mockSuggesterService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockSuggester, mockSuggester})
+	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)

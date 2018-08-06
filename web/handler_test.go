@@ -68,7 +68,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T) {
 	expect := assert.New(t)
 
-	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
+	body := []byte(`{"byline":"Test byline","bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest?authors=tme", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
@@ -140,7 +140,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
 
-	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
+	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func TestRequestHandler_HandleSuggestionErrorInvalidAuthorsParamOnGetSuggestions
 func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T) {
 	expect := assert.New(t)
 
-	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
+	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()

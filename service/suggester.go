@@ -23,6 +23,12 @@ const (
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
 var BadRequestError = errors.New("Suggestion API returned HTTP 400")
 
+type JsonInput struct {
+	Byline   string `json:"byline,omitempty"`
+	Body     string `json:"bodyXML"`
+	Headline string `json:"title,omitempty"`
+}
+
 type Client interface {
 	Do(req *http.Request) (resp *http.Response, err error)
 }
@@ -71,15 +77,6 @@ type SourceFlags struct {
 	Flags []string
 }
 
-func (sourceFlags *SourceFlags) hasFlag(value string) bool {
-	for _, flag := range sourceFlags.Flags {
-		if flag == value {
-			return true
-		}
-	}
-	return false
-}
-
 func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *FalconSuggester {
 	return &FalconSuggester{SuggestionApi{
 		apiBaseURL:         falconSuggestionApiBaseURL,
@@ -109,6 +106,10 @@ func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
+	data, err := getXmlSuggestionRequestFromJson(payload)
+	if err != nil {
+		data = payload
+	}
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 
 	var mutex = sync.Mutex{}
@@ -118,7 +119,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	for key, suggesterDelegate := range suggester.Suggesters {
 		wg.Add(1)
 		go func(i int, delegate Suggester) {
-			resp, err := delegate.GetSuggestions(payload, tid, flags)
+			resp, err := delegate.GetSuggestions(data, tid, flags)
 			if err != nil {
 				if err == NoContentError || err == BadRequestError {
 					log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
@@ -247,4 +248,45 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
 	}
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
+}
+
+func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
+
+	var jsonInput JsonInput
+
+	err := json.Unmarshal(jsonData, &jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonInput.Byline = TransformText(jsonInput.Byline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Body = TransformText(jsonInput.Body,
+		PullTagTransformer,
+		WebPullTagTransformer,
+		TableTagTransformer,
+		PromoBoxTagTransformer,
+		WebInlinePictureTagTransformer,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Headline = TransformText(jsonInput.Headline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+
+	data, err := json.Marshal(jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

@@ -10,13 +10,14 @@ import (
 
 	health "github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
+	"sync"
 )
 
 const (
-	personType = "http://www.ft.com/ontology/person/Person"
-	hasAuthor  = "http://www.ft.com/ontology/annotation/hasAuthor"
-	TmeSource  = "tme"
-	UppSource  = "upp"
+	personType    = "http://www.ft.com/ontology/person/Person"
+	hasAuthor     = "http://www.ft.com/ontology/annotation/hasAuthor"
+	TmeSource     = "tme"
+	AuthorsSource = "authors"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
@@ -33,21 +34,30 @@ type Client interface {
 }
 
 type Suggester interface {
-	GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error)
+	GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error)
+	GetName() string
 }
 
 type AggregateSuggester struct {
-	FalconSuggester  Suggester
-	AuthorsSuggester Suggester
+	Suggesters []Suggester
 }
 
 type SuggestionApi struct {
 	name               string
+	flag               string
 	apiBaseURL         string
 	suggestionEndpoint string
 	client             Client
 	systemId           string
 	failureImpact      string
+}
+
+type FalconSuggester struct {
+	SuggestionApi
+}
+
+type AuthorsSuggester struct {
+	SuggestionApi
 }
 
 type SuggestionsResponse struct {
@@ -64,33 +74,44 @@ type Suggestion struct {
 }
 
 type SourceFlags struct {
-	AuthorsFlag string
+	Flags []string
 }
 
-func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *SuggestionApi {
-	return &SuggestionApi{
+func (sourceFlags *SourceFlags) hasFlag(value string) bool {
+	for _, flag := range sourceFlags.Flags {
+		if flag == value {
+			return true
+		}
+	}
+	return false
+}
+
+func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *FalconSuggester {
+	return &FalconSuggester{SuggestionApi{
 		apiBaseURL:         falconSuggestionApiBaseURL,
 		suggestionEndpoint: falconSuggestionEndpoint,
 		client:             client,
 		name:               "Falcon Suggestion API",
+		flag:               TmeSource,
 		systemId:           "falcon-suggestion-api",
 		failureImpact:      "Suggestions from TME won't work",
-	}
+	}}
 }
 
-func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint string, client Client) *SuggestionApi {
-	return &SuggestionApi{
+func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint string, client Client) *AuthorsSuggester {
+	return &AuthorsSuggester{SuggestionApi{
 		apiBaseURL:         authorsSuggestionApiBaseURL,
 		suggestionEndpoint: authorsSuggestionEndpoint,
 		client:             client,
 		name:               "Authors Suggestion API",
+		flag:               AuthorsSource,
 		systemId:           "authors-suggestion-api",
 		failureImpact:      "Suggesting authors from Concept Search won't work",
-	}
+	}}
 }
 
-func NewAggregateSuggester(falconSuggester, authorsSuggester Suggester) *AggregateSuggester {
-	return &AggregateSuggester{FalconSuggester: falconSuggester, AuthorsSuggester: authorsSuggester}
+func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
+	return &AggregateSuggester{suggesters}
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
@@ -98,49 +119,36 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	if err != nil {
 		data = payload
 	}
+	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 
-	falconResp, err := suggester.FalconSuggester.GetSuggestions(data, tid)
-	if err != nil {
-		if err == NoContentError || err == BadRequestError {
-			log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
-		} else {
-			log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Falcon Suggestions API")
-		}
-	}
+	var mutex = sync.Mutex{}
+	var wg = sync.WaitGroup{}
 
-	switch flags.AuthorsFlag {
-	case TmeSource:
-		if falconResp.Suggestions == nil {
-			falconResp.Suggestions = make([]Suggestion, 0)
-		}
-		return falconResp
-	case UppSource:
-		authorsResp, err := suggester.AuthorsSuggester.GetSuggestions(data, tid)
-		if err != nil {
-			if err == NoContentError || err == BadRequestError {
-				log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
-			} else {
-				log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Error("Error calling Authors Suggestions API")
+	var responseMap = map[int][]Suggestion{}
+	for key, suggesterDelegate := range suggester.Suggesters {
+		wg.Add(1)
+		go func(i int, delegate Suggester) {
+			resp, err := delegate.GetSuggestions(data, tid, flags)
+			if err != nil {
+				if err == NoContentError || err == BadRequestError {
+					log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
+				} else {
+					log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Errorf("Error calling %v", delegate.GetName())
+				}
 			}
-		}
-
-		falconResp.Suggestions = filterOutAuthors(falconResp)
-
-		// return empty slice by default instead of nil/null suggestions response
-		var resp = SuggestionsResponse{
-			Suggestions: make([]Suggestion, 0, len(authorsResp.Suggestions)+len(falconResp.Suggestions)),
-		}
-
-		// merge results
-		resp.Suggestions = append(resp.Suggestions, authorsResp.Suggestions...)
-		resp.Suggestions = append(resp.Suggestions, falconResp.Suggestions...)
-		return resp
-	default:
-		log.WithTransactionID(tid).Error("Invalid authors flag")
-		return SuggestionsResponse{
-			Suggestions: make([]Suggestion, 0),
-		}
+			mutex.Lock()
+			responseMap[i] = resp.Suggestions
+			mutex.Unlock()
+			wg.Done()
+		}(key, suggesterDelegate)
 	}
+	wg.Wait()
+	// preserve results order
+	for i := 0; i < len(suggester.Suggesters); i++ {
+		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
+	}
+
+	return aggregateResp
 }
 
 func filterOutAuthors(resp SuggestionsResponse) []Suggestion {
@@ -159,7 +167,22 @@ func isNotAuthor(value Suggestion) bool {
 	return !(value.SuggestionType == personType && value.Predicate == hasAuthor)
 }
 
-func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+	suggestions, err := suggester.SuggestionApi.GetSuggestions(payload, tid, flags)
+	if err != nil {
+		return suggestions, err
+	}
+	if flags.hasFlag(AuthorsSource) {
+		suggestions.Suggestions = filterOutAuthors(suggestions)
+	}
+	return suggestions, err
+}
+
+func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+	if !flags.hasFlag(suggester.flag) {
+		return SuggestionsResponse{make([]Suggestion, 0)}, nil
+	}
+
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
 		return SuggestionsResponse{}, err
@@ -199,6 +222,10 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (Sugg
 	return response, nil
 }
 
+func (suggester *SuggestionApi) GetName() string {
+	return suggester.name
+}
+
 func (suggester *SuggestionApi) Check() health.Check {
 	return health.Check{
 		ID:               suggester.systemId,
@@ -231,6 +258,7 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 	}
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
 }
+
 func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 
 	var jsonInput JsonInput

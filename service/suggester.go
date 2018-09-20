@@ -75,6 +75,7 @@ type Suggestion struct {
 
 type SourceFlags struct {
 	Flags []string
+	Debug string
 }
 
 func (sourceFlags *SourceFlags) hasFlag(value string) bool {
@@ -116,6 +117,9 @@ func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
 	data, err := getXmlSuggestionRequestFromJson(payload)
+	if flags.Debug != "" {
+		log.WithTransactionID(tid).WithField("debug", flags.Debug).Info(string(data))
+	}
 	if err != nil {
 		data = payload
 	}
@@ -187,7 +191,9 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags
 	if err != nil {
 		return SuggestionsResponse{}, err
 	}
-
+	if flags.Debug != "" {
+		req.Header.Add("debug", flags.Debug)
+	}
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")

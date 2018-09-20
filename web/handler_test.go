@@ -78,7 +78,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{[]string{service.TmeSource}}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource}}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
 
 	handler := NewRequestHandler(&service.AggregateSuggester{[]service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)

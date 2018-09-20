@@ -29,7 +29,12 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 
 	tid := tidutils.GetTransactionIDFromRequest(request)
 
+	debug := request.Header.Get("debug")
+
 	body, err := ioutil.ReadAll(request.Body)
+	if debug != "" {
+		log.WithTransactionID(tid).WithField("debug", debug).Info(string(body))
+	}
 	if err != nil {
 		log.WithTransactionID(tid).WithError(err).Error("Error while reading payload")
 		writeResponse(writer, http.StatusBadRequest, []byte(`{"message": "Error while reading payload"}`))
@@ -53,7 +58,7 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		sourceFlags = []string{service.TmeSource, service.AuthorsSource}
 	}
 
-	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: sourceFlags})
+	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: sourceFlags, Debug: debug})
 	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}

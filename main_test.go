@@ -8,14 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"net"
+	"net/http/httptest"
+	"strings"
+
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"net/http/httptest"
-	"strings"
 )
 
 func TestMainApp(t *testing.T) {
@@ -158,10 +159,11 @@ func TestRequestHandler_all(t *testing.T) {
 		Transport: tr,
 		Timeout:   30 * time.Second,
 	}
-
+	concordanceApiBaseURL := "http://internal-concordances-api:8080"
+	concordanceEndpoint := "/internalconcordances"
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
-	suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
+	suggester := service.NewAggregateSuggester(concordanceApiBaseURL, concordanceEndpoint, falconSuggester, authorsSuggester)
 	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
 
 	go func() {

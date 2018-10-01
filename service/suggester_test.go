@@ -312,6 +312,8 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 
 func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
+	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
+	ConcordanceEndpoint := "/internalconcordances"
 	suggestionApi := new(mockSuggestionApi)
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
@@ -322,7 +324,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(ConcordanceApiBaseURL, ConcordanceEndpoint, suggestionApi, suggestionApi)
 	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
@@ -335,10 +337,12 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvailable(t *testing.T) {
 	expect := assert.New(t)
+	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
+	ConcordanceEndpoint := "/internalconcordances"
 	suggestionApi := new(mockSuggestionApi)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(ConcordanceApiBaseURL, ConcordanceEndpoint, suggestionApi, suggestionApi)
 	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 0)
@@ -349,13 +353,15 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 
 func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testing.T) {
 	expect := assert.New(t)
+	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
+	ConcordanceEndpoint := "/internalconcordances"
 	suggestionApi := new(mockSuggestionApi)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(ConcordanceApiBaseURL, ConcordanceEndpoint, suggestionApi, suggestionApi)
 	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 1)

@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	fp "path/filepath"
+
+	"sync"
 
 	health "github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
-	"sync"
+	concord "github.com/Financial-Times/internal-concordances/concepts"
 )
 
 const (
@@ -39,7 +42,9 @@ type Suggester interface {
 }
 
 type AggregateSuggester struct {
-	Suggesters []Suggester
+	ConcordanceBaseURL  string
+	ConcordanceEndpoint string
+	Suggesters          []Suggester
 }
 
 type SuggestionApi struct {
@@ -60,10 +65,6 @@ type AuthorsSuggester struct {
 	SuggestionApi
 }
 
-type SuggestionsResponse struct {
-	Suggestions []Suggestion `json:"suggestions"`
-}
-
 type Suggestion struct {
 	Predicate      string `json:"predicate,omitempty"`
 	Id             string `json:"id,omitempty"`
@@ -76,6 +77,14 @@ type Suggestion struct {
 type SourceFlags struct {
 	Flags []string
 	Debug string
+}
+
+type SuggestionsResponse struct {
+	Suggestions []Suggestion `json:"suggestions"`
+}
+
+type concordanceResponse struct {
+	Concepts []concord.Concept `json:"concepts"`
 }
 
 func (sourceFlags *SourceFlags) hasFlag(value string) bool {
@@ -111,8 +120,8 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 	}}
 }
 
-func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
-	return &AggregateSuggester{suggesters}
+func NewAggregateSuggester(concBaseURL string, concEndpoint string, suggesters ...Suggester) *AggregateSuggester {
+	return &AggregateSuggester{concBaseURL, concEndpoint, suggesters}
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
@@ -152,7 +161,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
 	}
 
-	return aggregateResp
+	return suggester.filterOutDeprecated(aggregateResp)
 }
 
 func filterOutAuthors(resp SuggestionsResponse) []Suggestion {
@@ -304,4 +313,51 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func (c *AggregateSuggester) filterOutDeprecated(s SuggestionsResponse) SuggestionsResponse {
+	if len(s.Suggestions) == 0 {
+		return s
+	}
+
+	var client http.Client
+
+	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
+	var concorded = concordanceResponse{Concepts: make([]concord.Concept, 0)}
+	queryString := ""
+
+	for _, suggestion := range s.Suggestions {
+		queryString = queryString + "&ids=" + fp.Base(suggestion.Id)
+	}
+	queryString = queryString[1:] + "&includeDeprecated=false"
+
+	req, err := http.NewRequest("GET", c.ConcordanceBaseURL+c.ConcordanceEndpoint+"?"+queryString, nil)
+	if err != nil {
+		return s
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return s
+	}
+
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	err = json.Unmarshal(body, &concorded)
+	if err != nil {
+		return s
+	}
+	i := 0
+	for _, c := range concorded.Concepts {
+		for _, suggestion := range s.Suggestions {
+			if c.ID == fp.Base(suggestion.Id) {
+				filtered.Suggestions[i] = suggestion
+				i++
+				break
+			}
+		}
+	}
+	return filtered
 }

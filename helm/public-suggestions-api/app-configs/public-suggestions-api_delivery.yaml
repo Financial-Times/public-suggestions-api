@@ -6,3 +6,8 @@ env:
   FALCON_SUGGESTION_ENDPOINT: "/content/suggest/falcon"
   AUTHORS_SUGGESTION_API_BASE_URL: "http://authors-suggestion-api:8080"
   AUTHORS_SUGGESTION_ENDPOINT: "/content/suggest/authors"
+  ONTOTEXT_SUGGESTION_API_BASE_URL: "http://ontotext-suggestion-api:8080"
+  ONTOTEXT_SUGGESTION_ENDPOINT: "/content/suggest/ontotext"
+  DEFAULT_SOURCE_PERSON: "tme"
+  DEFAULT_SOURCE_ORGANISATIONS: "tme"
+  DEFAULT_SOURCE_LOCATIONS: "tme"

@@ -71,6 +71,37 @@ func main() {
 		Desc:   "The endpoint for authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
+	ontotextSuggestionApiBaseURL := app.String(cli.StringOpt{
+		Name:   "ontotext-suggestion-api-base-url",
+		Value:  "http://ontotext-suggestion-api:8080",
+		Desc:   "The base URL to ontotext suggestion api",
+		EnvVar: "ONTOTEXT_SUGGESTION_API_BASE_URL",
+	})
+	ontotextSuggestionEndpoint := app.String(cli.StringOpt{
+		Name:   "ontotext-suggestion-endpoint",
+		Value:  "/content/suggest/ontotext",
+		Desc:   "The endpoint for ontotext suggestion api",
+		EnvVar: "ONTOTEXT_SUGGESTION_ENDPOINT",
+	})
+
+	defaultSourcePerson := app.String(cli.StringOpt{
+		Name:   "default-source-person",
+		Value:  "tme",
+		Desc:   "The default source for person suggestions",
+		EnvVar: "DEFAULT_SOURCE_PERSON",
+	})
+	defaultSourceOrganisation := app.String(cli.StringOpt{
+		Name:   "default-source-organisation",
+		Value:  "tme",
+		Desc:   "The default source for organisations suggestions",
+		EnvVar: "DEFAULT_SOURCE_ORGANISATION",
+	})
+	defaultSourceLocation := app.String(cli.StringOpt{
+		Name:   "default-source-location",
+		Value:  "tme",
+		Desc:   "The default source for locations suggestions",
+		EnvVar: "DEFAULT_SOURCE_LOCATION",
+	})
 
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
@@ -89,9 +120,16 @@ func main() {
 			Transport: tr,
 			Timeout:   30 * time.Second,
 		}
+
+		defaultSources := map[string]string{
+			service.ConceptTypePerson:       *defaultSourcePerson,
+			service.ConceptTypeLocation:     *defaultSourceLocation,
+			service.ConceptTypeOrganisation: *defaultSourceOrganisation,
+		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
-		suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
+		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
+		suggester := service.NewAggregateSuggester(defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)

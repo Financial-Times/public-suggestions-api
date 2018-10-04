@@ -8,15 +8,21 @@ import (
 	"testing"
 	"time"
 
+	"net"
+	"net/http/httptest"
+	"strings"
+
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"net/http/httptest"
-	"strings"
 )
+
+func TestMain(m *testing.M) {
+	log.InitDefaultLogger("test")
+	os.Exit(m.Run())
+}
 
 func TestMainApp(t *testing.T) {
 	expect := require.New(t)
@@ -69,81 +75,200 @@ func TestMainApp(t *testing.T) {
 }
 
 func TestRequestHandler_all(t *testing.T) {
-
-	expectedSuggestions := []service.Suggestion{
+	expectedFalconSuggestions := []service.Suggestion{
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+			Id:             "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			ApiUrl:         "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			PrefLabel:      "London Politics",
+			SuggestionType: "http://www.ft.com/ontology/Topic",
 		},
 		{
+			Id:             "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+			ApiUrl:         "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+			PrefLabel:      "London",
+			SuggestionType: "http://www.ft.com/ontology/Location",
+		},
+		{
+			Id:             "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+			ApiUrl:         "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+			PrefLabel:      "Apple",
+			SuggestionType: "http://www.ft.com/ontology/organisation/Organisation",
+		},
+	}
+
+	expectedAuthorsSuggestions := []service.Suggestion{
+		{
 			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b6",
+			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b6",
 			PrefLabel:      "Lawrence Summers",
 			SuggestionType: "http://www.ft.com/ontology/person/Person",
 			IsFTAuthor:     true,
 		},
 	}
+
+	expectedOntotextSuggestions := []service.Suggestion{
+		{
+			Id:             "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+			ApiUrl:         "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+			PrefLabel:      "London",
+			SuggestionType: "http://www.ft.com/ontology/Location",
+		},
+		{
+			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
+			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c7355",
+			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c7355",
+			PrefLabel:      "Donald Kaberuka",
+			SuggestionType: "http://www.ft.com/ontology/person/Person",
+		},
+		{
+			Id:             "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+			ApiUrl:         "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
+			PrefLabel:      "Apple",
+			SuggestionType: "http://www.ft.com/ontology/organisation/Organisation",
+		},
+	}
 	tests := []struct {
+		testName            string
 		url                 string
 		expectedStatus      int
 		expectedSuggestions []service.Suggestion
 	}{
-		{url: "http://localhost:8081/content/suggest?source=tme&source=authors", expectedStatus: http.StatusOK, expectedSuggestions: expectedSuggestions},
-		{url: "http://localhost:8081/content/suggest?source=tme", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
-			expectedSuggestions[0],
-			expectedSuggestions[1],
-		}},
-		{url: "http://localhost:8081/content/suggest?source=authors", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
-			expectedSuggestions[1],
-		}},
-		{url: "http://localhost:8081/content/suggest", expectedStatus: http.StatusOK, expectedSuggestions: []service.Suggestion{
-			expectedSuggestions[0],
-			expectedSuggestions[1],
-		}},
+		{
+			testName:            "okSuggestions",
+			url:                 "http://localhost:8081/content/suggest",
+			expectedStatus:      http.StatusOK,
+			expectedSuggestions: append(expectedFalconSuggestions, expectedAuthorsSuggestions...),
+		},
+		{
+			testName:            "OkWithTmePersonFlag",
+			url:                 "http://localhost:8081/content/suggest?person=tme",
+			expectedStatus:      http.StatusOK,
+			expectedSuggestions: append(expectedFalconSuggestions, expectedAuthorsSuggestions...),
+		},
+		{
+			testName:            "OkWithTmePersonAndLocationFlag",
+			url:                 "http://localhost:8081/content/suggest?person=tme&location=tme",
+			expectedStatus:      http.StatusOK,
+			expectedSuggestions: append(expectedFalconSuggestions, expectedAuthorsSuggestions...),
+		},
+		{
+			testName:            "OkWithAllTmeFlags",
+			url:                 "http://localhost:8081/content/suggest?person=tme&location=tme&organisation=tme",
+			expectedStatus:      http.StatusOK,
+			expectedSuggestions: append(expectedFalconSuggestions, expectedAuthorsSuggestions...),
+		},
+		{
+			testName:       "OkWithCesPersonFlag",
+			url:            "http://localhost:8081/content/suggest?person=ces",
+			expectedStatus: http.StatusOK,
+			expectedSuggestions: []service.Suggestion{
+				expectedFalconSuggestions[0],
+				expectedFalconSuggestions[1],
+				expectedFalconSuggestions[2],
+				expectedAuthorsSuggestions[0],
+				expectedOntotextSuggestions[1],
+			},
+		},
+		{
+			testName:       "OkWithCesPersonAndLocationFlag",
+			url:            "http://localhost:8081/content/suggest?person=ces&location=ces",
+			expectedStatus: http.StatusOK,
+			expectedSuggestions: []service.Suggestion{
+				expectedFalconSuggestions[0],
+				expectedFalconSuggestions[2],
+				expectedAuthorsSuggestions[0],
+				expectedOntotextSuggestions[0],
+				expectedOntotextSuggestions[1],
+			},
+		},
+		{
+			testName:       "OkWithAllCesFlags",
+			url:            "http://localhost:8081/content/suggest?person=ces&location=ces&organisation=ces",
+			expectedStatus: http.StatusOK,
+			expectedSuggestions: []service.Suggestion{
+				expectedFalconSuggestions[0],
+				expectedAuthorsSuggestions[0],
+				expectedOntotextSuggestions[0],
+				expectedOntotextSuggestions[1],
+				expectedOntotextSuggestions[2],
+			},
+		},
 	}
 
-	log.InitDefaultLogger("test")
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		w.WriteHeader(status)
 		switch {
 		case strings.Contains(r.RequestURI, "/falcon"):
-			w.Write([]byte(`{
-    		"suggestions": [{
-    		        "predicate": "http://www.ft.com/ontology/annotation/mentions",
-    		        "id": "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-    		        "apiUrl": "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-    		        "prefLabel": "Donald Kaberuka",
-    		        "type": "http://www.ft.com/ontology/person/Person",
-    		        "isFTAuthor": false
-    		    },
-    		    {
-    		        "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
-    		        "id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-    		        "apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-    		        "prefLabel": "Lawrence Summers",
-    		        "type": "http://www.ft.com/ontology/person/Person",
-    		        "isFTAuthor": true
-    		    }
-    		]}`))
+			w.Write([]byte(`{  
+				"suggestions":[
+				  {
+					"predicate":"http://www.ft.com/ontology/annotation/hasAuthor",
+					"id":"http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b0",
+					"apiUrl":"http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b0",
+					"prefLabel":"Lawrence Summers",
+					"type":"http://www.ft.com/ontology/person/Person",
+					"isFTAuthor":true
+				  },
+				  {
+					"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					"apiUrl":"http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					"prefLabel":"London Politics",
+					"type":"http://www.ft.com/ontology/Topic"
+				  },
+				  {
+					"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					"prefLabel":"London",
+					"type":"http://www.ft.com/ontology/Location"
+				  },
+				  {
+					"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+					"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+					"prefLabel":"Apple",
+					"type":"http://www.ft.com/ontology/organisation/Organisation"
+				  }
+				]
+			  }`))
 
 		case strings.Contains(r.RequestURI, "/authors"):
 			w.Write([]byte(`{
-    		"suggestions": [
-    		    {
-    		        "predicate": "http://www.ft.com/ontology/annotation/hasAuthor",
-    		        "id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-    		        "apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-    		        "prefLabel": "Lawrence Summers",
-    		        "type": "http://www.ft.com/ontology/person/Person",
-    		        "isFTAuthor": true
-    		    }
-    		]}`))
+				"suggestions":[
+				  {
+					"predicate":"http://www.ft.com/ontology/annotation/hasAuthor",
+					"id":"http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b6",
+					"apiUrl":"http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b6",
+					"prefLabel":"Lawrence Summers",
+					"type":"http://www.ft.com/ontology/person/Person",
+					"isFTAuthor":true
+				  }
+				]
+			  }`))
+		case strings.Contains(r.RequestURI, "/ontotext"):
+			w.Write([]byte(`{
+				"suggestions":[
+				  {
+					"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+					"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+					"prefLabel":"London",
+					"type":"http://www.ft.com/ontology/Location"
+				  },
+				  {
+					"predicate":"http://www.ft.com/ontology/annotation/mentions",
+					"id":"http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c7355",
+					"apiUrl":"http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c7355",
+					"prefLabel":"Donald Kaberuka",
+					"type":"http://www.ft.com/ontology/person/Person"
+				  },
+				  {
+					"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+					"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
+					"prefLabel":"Apple",
+					"type":"http://www.ft.com/ontology/organisation/Organisation"
+				  }
+				]
+			  }`))
 		}
 	}))
 
@@ -159,10 +284,12 @@ func TestRequestHandler_all(t *testing.T) {
 		Timeout:   30 * time.Second,
 	}
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
-	suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
-	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
+	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
+	suggester := service.NewAggregateSuggester(defaultConceptsSources, falconSuggester, authorsSuggester, ontotextSuggester)
+	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
@@ -174,9 +301,9 @@ func TestRequestHandler_all(t *testing.T) {
 
 		req, _ := http.NewRequest("POST", test.url, strings.NewReader(`{"body":"test"}`))
 		res, err := client.Do(req)
-		assert.NoError(t, err)
+		assert.NoErrorf(t, err, "%s -> unexpected error", test.testName)
 
-		assert.Equal(t, test.expectedStatus, res.StatusCode)
+		assert.Equalf(t, test.expectedStatus, res.StatusCode, "%s -> unexpected status code", test.testName)
 		if test.expectedStatus == http.StatusOK {
 			rBody := make([]byte, res.ContentLength)
 			res.Body.Read(rBody)
@@ -184,8 +311,16 @@ func TestRequestHandler_all(t *testing.T) {
 
 			suggestionsResponse := service.SuggestionsResponse{}
 			json.Unmarshal(rBody, &suggestionsResponse)
-			assert.Equal(t, test.expectedSuggestions, suggestionsResponse.Suggestions)
+			assert.Equalf(t, test.expectedSuggestions, suggestionsResponse.Suggestions, "%s -> not the same suggestions", test.testName)
 		}
 	}
 
+}
+
+func buildDefaultConceptSources() map[string]string {
+	defaultConceptsSource := map[string]string{}
+	for _, conceptType := range service.ConceptTypes {
+		defaultConceptsSource[conceptType] = service.TmeSource
+	}
+	return defaultConceptsSource
 }

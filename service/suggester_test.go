@@ -3,11 +3,15 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
+	log "github.com/Financial-Times/go-logger"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,6 +36,65 @@ const sampleJSONResponse = `{
         }
     ]
 }`
+
+const sampleFalconResponse = `{
+	"suggestions":[
+	  {
+		"predicate":"http://www.ft.com/ontology/annotation/hasAuthor",
+		"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc494",
+		"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc494",
+		"prefLabel":"Adam Samson",
+		"type":"http://www.ft.com/ontology/person/Person"
+	  },
+	  {
+		"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+		"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+		"prefLabel":"London",
+		"type":"http://www.ft.com/ontology/Location"
+	  },
+	  {
+		"id":"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+		"apiUrl":"http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a30",
+		"prefLabel":"Eric Platt",
+		"type":"http://www.ft.com/ontology/person/Person"
+	  },
+	  {
+		"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+		"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+		"prefLabel":"Apple",
+		"type":"http://www.ft.com/ontology/organisation/Organisation"
+	  },
+	  {
+		"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+		"apiUrl":"http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+		"prefLabel":"London Politics",
+		"type":"http://www.ft.com/ontology/Topic"
+	  }
+	]
+  }`
+
+const sampleOntotextResponse = `{
+	"suggestions":[
+	  {
+		"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+		"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+		"prefLabel":"London",
+		"type":"http://www.ft.com/ontology/Location"
+	  },
+	  {
+		"id":"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
+		"apiUrl":"http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385",
+		"prefLabel":"Eric Platt",
+		"type":"http://www.ft.com/ontology/person/Person"
+	  },
+	  {
+		"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+		"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
+		"prefLabel":"Apple",
+		"type":"http://www.ft.com/ontology/organisation/Organisation"
+	  }
+	]
+  }`
 
 type mockHttpClient struct {
 	mock.Mock
@@ -111,7 +174,12 @@ func (b *mockResponseBody) Close() error {
 	return args.Error(0)
 }
 
-func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
+func TestMain(m *testing.M) {
+	log.InitDefaultLogger("test")
+	os.Exit(m.Run())
+}
+
+func TestFalconSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) {
 	expect := assert.New(t)
 
 	expectedSuggestions := []Suggestion{
@@ -139,17 +207,16 @@ func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
 	expect.NotNil(actualSuggestions)
-	expect.True(len(actualSuggestions) == len(expectedSuggestions))
+	expect.Len(actualSuggestions, 1)
 
-	for _, expected := range expectedSuggestions {
-		expect.Contains(actualSuggestions, expected)
-	}
+	expect.Contains(actualSuggestions, expectedSuggestions[0])
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
@@ -159,8 +226,9 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusServiceUnavailable, nil)
 	server := mockServer.startMockServer(t)
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Error(err)
 	expect.Equal("Falcon Suggestion API returned HTTP 503", err.Error())
@@ -171,8 +239,9 @@ func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 
 func TestFalconSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester(":/", "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -184,8 +253,9 @@ func TestFalconSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -202,8 +272,9 @@ func TestFalconSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	mockBody.On("Read", mock.AnythingOfType("[]uint8")).Return(0, errors.New("Read error"))
 	mockBody.On("Close").Return(nil)
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
@@ -218,8 +289,9 @@ func TestFalconSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte{})
 	server := mockServer.startMockServer(t)
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Error(err)
 	expect.Equal("unexpected end of JSON input", err.Error())
@@ -310,20 +382,21 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
-func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
+func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
+		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: ontologyPersonType},
 	}}
 	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: ontologyPersonType},
 	}}
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	defaultConceptsSources := buildDefaultConceptSources()
+	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, suggestionApi, suggestionApi)
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Len(response.Suggestions, 2)
 
@@ -333,13 +406,71 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	suggestionApi.AssertExpectations(t)
 }
 
+func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
+	expect := assert.New(t)
+
+	falconMock := new(mockHttpClient)
+	falconMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{
+				"suggestions":[
+					{
+						"id":             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5",
+						"apiUrl":         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b5",
+						"prefLabel":      "Lawrence Summers",
+						"type": 		  "http://www.ft.com/ontology/person/Person"
+					},
+					{
+						"predicate":      "http://www.ft.com/ontology/annotation/hasAuthor",
+						"id":             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139265",
+						"apiUrl":         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139265",
+						"prefLabel":      "Lawrence Summers",
+						"type":           "http://www.ft.com/ontology/person/Person",
+						"isFTAuthor":     true
+					}
+				]
+			}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	authorsMock := new(mockHttpClient)
+	// authors
+	authorsMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{
+				"suggestions":[
+					{
+						"predicate":      "http://www.ft.com/ontology/annotation/hasAuthor",
+						"id":             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260",
+						"apiUrl":         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139260",
+						"prefLabel":      "Lawrence Summers",
+						"type":           "http://www.ft.com/ontology/person/Person"
+					}
+				]
+			}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+
+	falconSuggester := NewFalconSuggester("falconUrl", "falconEndpoint", falconMock)
+	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
+
+	defaultConceptsSources := buildDefaultConceptSources()
+	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, falconSuggester, authorsSuggester)
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+
+	expect.Len(response.Suggestions, 2)
+
+	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5", response.Suggestions[0].Id)
+	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260", response.Suggestions[1].Id)
+}
+
 func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvailable(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	defaultConceptsSources := buildDefaultConceptSources()
+	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, suggestionApi, suggestionApi)
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Len(response.Suggestions, 0)
 	expect.NotNil(response.Suggestions)
@@ -352,11 +483,12 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	suggestionApi := new(mockSuggestionApi)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: ontologyPersonType},
 	}}, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	defaultConceptsSources := buildDefaultConceptSources()
+	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, suggestionApi, suggestionApi)
+	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Len(response.Suggestions, 1)
 
@@ -368,7 +500,8 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 func TestGetSuggestions_NoResultsForAuthorsTmeSourceFlag(t *testing.T) {
 	expect := assert.New(t)
 	suggester := AuthorsSuggester{}
-	response, _ := suggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{TmeSource}})
+	defaultConceptsSources := buildDefaultConceptSources()
+	response, _ := suggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Equal(response.Suggestions, []Suggestion{})
 }
@@ -401,8 +534,9 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewAuthorsSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -435,8 +569,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 
+	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: []string{TmeSource, AuthorsSource}})
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -447,4 +582,225 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 		expect.Contains(actualSuggestions, expected)
 	}
 	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t *testing.T) {
+	expect := assert.New(t)
+
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	tests := []struct {
+		testName      string
+		expectedUUIDs []string
+		flags         map[string]string
+	}{
+		{
+			testName: "withoutFlags",
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			},
+			flags: defaultConceptsSources,
+		},
+		{
+			testName: "allTmeFlags",
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			},
+			flags: map[string]string{
+				ConceptTypePerson:       TmeSource,
+				ConceptTypeLocation:     TmeSource,
+				ConceptTypeOrganisation: TmeSource,
+			},
+		},
+		{
+			testName: "allCesFlags",
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
+				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+			},
+			flags: map[string]string{
+				ConceptTypePerson:       CesSource,
+				ConceptTypeLocation:     CesSource,
+				ConceptTypeOrganisation: CesSource,
+			},
+		},
+		{
+			testName: "cesPeople",
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
+			},
+			flags: map[string]string{
+				ConceptTypePerson:       CesSource,
+				ConceptTypeLocation:     TmeSource,
+				ConceptTypeOrganisation: TmeSource,
+			},
+		},
+		{
+			testName: "cesLocation",
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+			},
+			flags: map[string]string{
+				ConceptTypePerson:       TmeSource,
+				ConceptTypeLocation:     CesSource,
+				ConceptTypeOrganisation: TmeSource,
+			},
+		},
+		{
+			testName: "cesOrganisation",
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+			},
+			flags: map[string]string{
+				ConceptTypePerson:       TmeSource,
+				ConceptTypeLocation:     TmeSource,
+				ConceptTypeOrganisation: CesSource,
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		falconHTTPMock := new(mockHttpClient)
+		falconHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(strings.NewReader(sampleFalconResponse)),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		ontotextHTTPMock := new(mockHttpClient)
+		ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(strings.NewReader(sampleOntotextResponse)),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
+		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
+		aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, falconSuggester, ontotextSuggester)
+
+		suggestionResp := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
+
+		actualSuggestions := suggestionResp.Suggestions
+		expect.NotNilf(actualSuggestions, "%s -> nil suggestions", testCase.testName)
+		expect.Lenf(actualSuggestions, len(testCase.expectedUUIDs), "%s -> unexpected number of suggestions", testCase.testName)
+
+		for _, expectedID := range testCase.expectedUUIDs {
+			found := false
+			for _, actualSugg := range actualSuggestions {
+				if expectedID == actualSugg.Id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				expect.Failf("expected suggestion not returned", "%s -> %s missing", testCase.testName, expectedID)
+			}
+		}
+	}
+}
+
+func TestOntotext_MissingDefaultValues(t *testing.T) {
+	expect := assert.New(t)
+
+	ontotextHTTPMock := new(mockHttpClient)
+	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader(sampleOntotextResponse)),
+		StatusCode: http.StatusOK,
+	}, nil)
+
+	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
+	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
+		ConceptTypeLocation:     TmeSource,
+		ConceptTypeOrganisation: TmeSource,
+	}})
+
+	expect.Error(err)
+	expect.Equal("No source defined for person", err.Error())
+
+	expect.NotNil(resp)
+	expect.Len(resp.Suggestions, 0)
+}
+
+func TestFalcon_MissingDefaultValues(t *testing.T) {
+	expect := assert.New(t)
+
+	falconHTTPMock := new(mockHttpClient)
+	falconHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader(sampleFalconResponse)),
+		StatusCode: http.StatusOK,
+	}, nil)
+
+	suggester := NewFalconSuggester("falconURL", "falconEndpoint", falconHTTPMock)
+	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
+		ConceptTypeLocation:     CesSource,
+		ConceptTypeOrganisation: CesSource,
+	}})
+
+	expect.Error(err)
+	expect.Equal("No source defined for person", err.Error())
+
+	expect.NotNil(resp)
+	expect.Len(resp.Suggestions, 0)
+}
+
+func TestOntotext_ErrorFromService(t *testing.T) {
+	expect := assert.New(t)
+
+	ontotextHTTPMock := new(mockHttpClient)
+	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, fmt.Errorf("Error from ontotext-suggestions-api"))
+
+	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
+	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
+		ConceptTypeLocation:     CesSource,
+		ConceptTypeOrganisation: TmeSource,
+	}})
+
+	expect.Error(err)
+	expect.Equal("Error from ontotext-suggestions-api", err.Error())
+
+	expect.NotNil(resp)
+	expect.Len(resp.Suggestions, 0)
+}
+
+func TestHasFlag(t *testing.T) {
+	expect := assert.New(t)
+
+	firstSuggesterTargetedTypes := []string{ConceptTypePerson, ConceptTypeOrganisation}
+	secondSuggesterTargetedTypes := []string{ConceptTypeLocation}
+	sourceFlags := SourceFlags{
+		Flags: map[string]string{
+			ConceptTypeLocation:     CesSource,
+			ConceptTypeOrganisation: CesSource,
+			ConceptTypePerson:       CesSource,
+		},
+	}
+	expect.True(sourceFlags.hasFlag(CesSource, firstSuggesterTargetedTypes))
+	expect.True(sourceFlags.hasFlag(CesSource, secondSuggesterTargetedTypes))
+
+	sourceFlags.Flags[ConceptTypeLocation] = TmeSource
+	expect.True(sourceFlags.hasFlag(CesSource, firstSuggesterTargetedTypes))
+	expect.False(sourceFlags.hasFlag(CesSource, secondSuggesterTargetedTypes))
+}
+
+func buildDefaultConceptSources() map[string]string {
+	defaultConceptsSource := map[string]string{}
+	for _, conceptType := range ConceptTypes {
+		defaultConceptsSource[conceptType] = TmeSource
+	}
+	return defaultConceptsSource
 }

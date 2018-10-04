@@ -47,18 +47,16 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	sourceFlags, found, err := util.GetMultipleValueQueryParameter(request, "source", service.TmeSource, service.AuthorsSource)
+	defaultValues, err := prepareTypesSource(request, handler.Suggester.DefaultSource)
+	// sourceFlags, found, err := util.GetMultipleValueQueryParameter(request, "source", service.TmeSource, service.AuthorsSource)
 	if err != nil {
-		errMsg := "source flag incorrectly set"
+		errMsg := fmt.Sprintf("source flag incorrectly set. Accepted values are: %s, %s", service.CesSource, service.TmeSource)
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)
 		writeResponse(writer, http.StatusBadRequest, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
 		return
 	}
-	if !found {
-		sourceFlags = []string{service.TmeSource, service.AuthorsSource}
-	}
 
-	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: sourceFlags, Debug: debug})
+	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: defaultValues, Debug: debug})
 	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}
@@ -83,4 +81,21 @@ func writeResponse(writer http.ResponseWriter, status int, response []byte) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(status)
 	writer.Write(response)
+}
+
+func prepareTypesSource(req *http.Request, defaultValues map[string]string) (map[string]string, error) {
+	result := make(map[string]string)
+	for conceptType, defaultValue := range defaultValues {
+		val, found, err := util.GetSingleValueQueryParameter(req, conceptType, service.TmeSource, service.CesSource)
+		if err != nil {
+			return result, err
+		}
+		if found {
+			result[conceptType] = val
+		} else {
+			result[conceptType] = defaultValue
+		}
+	}
+
+	return result, nil
 }

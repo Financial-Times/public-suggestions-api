@@ -19,8 +19,22 @@ func init() {
 	log.InitLogger("handler_test", "ERROR")
 }
 
+type mockHttpClient struct {
+	mock.Mock
+}
+
+func (c *mockHttpClient) Do(req *http.Request) (resp *http.Response, err error) {
+	args := c.Called(req)
+	return args.Get(0).(*http.Response), args.Error(1)
+}
+
 type mockSuggesterService struct {
 	mock.Mock
+}
+
+type mockConcordanceService struct {
+	mock.Mock
+	mockHttpClient
 }
 
 type faultyReader struct {
@@ -50,8 +64,6 @@ func (s *mockSuggesterService) Check() v1_1.Check {
 
 func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
 
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
@@ -60,49 +72,46 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{{PrefLabel: "TestMan"}}}
 	mockSuggester := new(mockSuggesterService)
+	mockConcordance := new(service.ConcordanceService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(expectedResp, nil).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{}, nil)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[{"prefLabel":"TestMan"}]}`, w.Body.String())
+	expect.Equal(`{"suggestions":[]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
 func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
+
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest?source=tme", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
+	mockConcordance := new(service.ConcordanceService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource}}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
-
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[{"prefLabel":"TmePrefLabel"}]}`, w.Body.String())
+	expect.Equal(`{"suggestions":[]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
 func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
 
 	req := httptest.NewRequest("POST", "/content/suggest", &faultyReader{})
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	mockConcordance := new(service.ConcordanceService)
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -112,16 +121,15 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 
 func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
+
 	body := []byte("")
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	mockConcordance := new(service.ConcordanceService)
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -131,16 +139,15 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 
 func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
+
 	body := []byte("{}")
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	mockConcordance := new(service.ConcordanceService)
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -150,36 +157,34 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 
 func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
+
 	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
+	mockConcordance := new(service.ConcordanceService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
-	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	expect.Equal(http.StatusServiceUnavailable, w.Code)
+	expect.Equal(`{"message": "aggregating suggestions failed!"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
 func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest?source=invalid", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	mockConcordance := new(service.ConcordanceService)
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -189,42 +194,40 @@ func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(
 
 func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
 	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
+	mockConcordance := new(service.ConcordanceService)
 	service.NoContentError = errors.New("No content error")
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{make([]service.Suggestion, 0)}, service.NoContentError)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
-	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	expect.Equal(http.StatusServiceUnavailable, w.Code)
+	expect.Equal(`{"message": "aggregating suggestions failed!"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
 //Might not happen at all if MetadataServices returns always 204 when there are no suggestions
 func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	expect := assert.New(t)
-	ConcordanceApiBaseURL := "http://internal-concordances-api:8080"
-	ConcordanceEndpoint := "/internalconcordances"
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
 	mockSuggester := new(mockSuggesterService)
+	mockConcordance := new(service.ConcordanceService)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{ConcordanceApiBaseURL, ConcordanceEndpoint, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
-	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	expect.Equal(http.StatusServiceUnavailable, w.Code)
+	expect.Equal(`{"message": "aggregating suggestions failed!"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }

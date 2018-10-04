@@ -131,7 +131,28 @@ func TestRequestHandler_all(t *testing.T) {
     		        "type": "http://www.ft.com/ontology/person/Person",
     		        "isFTAuthor": true
     		    }
-    		]}`))
+			]}`))
+
+		case strings.Contains(r.RequestURI, "/internalconcordances"):
+			w.Write([]byte(`{
+				"concepts": {
+					"6f14ea94-690f-3ed4-98c7-b926683c735a": {
+						"id": "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						"apiUrl": "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						"type": "http://www.ft.com/ontology/person/Person",
+						"prefLabel": "Donald Kaberuka",
+						"isFTAuthor": false
+					},
+					"9a5e3b4a-55da-498c-816f-9c534e1392bd": {	
+						"id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+						"apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+						"type": "http://www.ft.com/ontology/person/Person",
+						"prefLabel": "Lawrence Summers",
+						"isFTAuthor": true
+					}
+				}
+    		    
+    		}`))
 
 		case strings.Contains(r.RequestURI, "/authors"):
 			w.Write([]byte(`{
@@ -159,11 +180,10 @@ func TestRequestHandler_all(t *testing.T) {
 		Transport: tr,
 		Timeout:   30 * time.Second,
 	}
-	concordanceApiBaseURL := "http://internal-concordances-api:8080"
-	concordanceEndpoint := "/internalconcordances"
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
-	suggester := service.NewAggregateSuggester(concordanceApiBaseURL, concordanceEndpoint, falconSuggester, authorsSuggester)
+	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
+	suggester := service.NewAggregateSuggester(*concordance, falconSuggester, authorsSuggester)
 	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
 
 	go func() {

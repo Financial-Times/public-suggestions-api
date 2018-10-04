@@ -104,7 +104,7 @@ func main() {
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
 		concordanceService := service.NewConcordance(*conceptConcordancesApiBaseURL, *conceptConcordancesEndpoint, c)
-		suggester := service.NewAggregateSuggester(*concordanceService, falconSuggester, authorsSuggester)
+		suggester := service.NewAggregateSuggester(concordanceService, falconSuggester, authorsSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)

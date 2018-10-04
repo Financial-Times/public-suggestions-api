@@ -57,9 +57,9 @@ type SuggestionApi struct {
 }
 
 type ConcordanceService struct {
-	concordanceBaseURL  string
-	concordanceEndpoint string
-	client              Client
+	ConcordanceBaseURL  string
+	ConcordanceEndpoint string
+	Client              Client
 }
 
 type FalconSuggester struct {
@@ -96,7 +96,7 @@ type SuggestionsResponse struct {
 	Suggestions []Suggestion `json:"suggestions"`
 }
 
-type concordanceResponse struct {
+type ConcordanceResponse struct {
 	Concepts map[string]Concept `json:"concepts"`
 }
 
@@ -135,14 +135,14 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 
 func NewConcordance(conceptConcordancesApiBaseURL, conceptConcordancesEndpoint string, client Client) *ConcordanceService {
 	return &ConcordanceService{
-		concordanceBaseURL:  conceptConcordancesApiBaseURL,
-		concordanceEndpoint: conceptConcordancesEndpoint,
-		client:              client,
+		ConcordanceBaseURL:  conceptConcordancesApiBaseURL,
+		ConcordanceEndpoint: conceptConcordancesEndpoint,
+		Client:              client,
 	}
 }
 
-func NewAggregateSuggester(concordance ConcordanceService, suggesters ...Suggester) *AggregateSuggester {
-	return &AggregateSuggester{&concordance, suggesters}
+func NewAggregateSuggester(concordance *ConcordanceService, suggesters ...Suggester) *AggregateSuggester {
+	return &AggregateSuggester{concordance, suggesters}
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
@@ -227,12 +227,12 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 
 func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse) (SuggestionsResponse, error) {
 	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
-	var concorded concordanceResponse
+	var concorded ConcordanceResponse
 	if len(s.Suggestions) == 0 {
 		return filtered, errors.New("Empty suggestions")
 	}
 
-	req, err := http.NewRequest("GET", suggester.Concordance.concordanceBaseURL+suggester.Concordance.concordanceEndpoint, nil)
+	req, err := http.NewRequest("GET", suggester.Concordance.ConcordanceBaseURL+suggester.Concordance.ConcordanceEndpoint, nil)
 	if err != nil {
 		return filtered, err
 	}
@@ -247,7 +247,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 
 	req.URL.RawQuery = queryParams.Encode()
 
-	resp, err := suggester.Concordance.client.Do(req)
+	resp, err := suggester.Concordance.Client.Do(req)
 	if err != nil {
 		return filtered, err
 	}

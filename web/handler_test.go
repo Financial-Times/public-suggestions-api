@@ -8,11 +8,14 @@ import (
 
 	"errors"
 
+	"encoding/json"
+
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -28,13 +31,17 @@ func (c *mockHttpClient) Do(req *http.Request) (resp *http.Response, err error) 
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
-type mockSuggesterService struct {
-	mock.Mock
+type ClosingBuffer struct {
+	*bytes.Buffer
 }
 
-type mockConcordanceService struct {
+func (cb *ClosingBuffer) Close() (err error) {
+	// do nothing
+	return
+}
+
+type mockSuggesterService struct {
 	mock.Mock
-	mockHttpClient
 }
 
 type faultyReader struct {
@@ -69,17 +76,35 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
+	personType := "http://www.ft.com/ontology/person/Person"
+	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
+		{IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+	}}
 
-	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{{PrefLabel: "TestMan"}}}
+	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
-	mockConcordance := new(service.ConcordanceService)
+	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
+
+	mockInternalConcResp := service.ConcordanceResponse{
+		Concepts: make(map[string]service.Concept),
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = service.Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: personType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(expectedResp, nil).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{}, nil)
 	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	expect.Equal(`{"suggestions":[{"id":"authors-suggestion-api","apiUrl":"apiurl2","prefLabel":"prefLabel2","type":"http://www.ft.com/ontology/person/Person","isFTAuthor":true}]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
@@ -91,14 +116,35 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	personType := "http://www.ft.com/ontology/person/Person"
+	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
+		{IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
+	}}
+
+	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
-	mockConcordance := new(service.ConcordanceService)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource}}).Return(service.SuggestionsResponse{[]service.Suggestion{{PrefLabel: "TmePrefLabel"}}}, nil).Once()
+	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
+
+	mockInternalConcResp := service.ConcordanceResponse{
+		Concepts: make(map[string]service.Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = service.Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: personType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource}}).Return(expectedResp, nil).Once()
+
 	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	expect.Equal(`{"suggestions":[{"id":"falcon-suggestion-api","apiUrl":"apiurl1","prefLabel":"prefLabel1","type":"http://www.ft.com/ontology/person/Person"}]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 

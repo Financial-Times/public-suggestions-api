@@ -17,6 +17,7 @@ import (
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sort"
 )
 
 func TestMainApp(t *testing.T) {
@@ -183,13 +184,13 @@ func TestRequestHandler_all(t *testing.T) {
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
-	suggester := service.NewAggregateSuggester(*concordance, falconSuggester, authorsSuggester)
+	suggester := service.NewAggregateSuggester(concordance, falconSuggester, authorsSuggester)
 	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
 	}()
-
+	time.Sleep(time.Microsecond * 5000)
 	client := &http.Client{}
 
 	for _, test := range tests {
@@ -206,6 +207,10 @@ func TestRequestHandler_all(t *testing.T) {
 
 			suggestionsResponse := service.SuggestionsResponse{}
 			json.Unmarshal(rBody, &suggestionsResponse)
+			suggestions := suggestionsResponse.Suggestions
+			sort.Slice(suggestions, func(i, j int) bool {
+				return suggestions[i].Id < suggestions[j].Id
+			})
 			assert.Equal(t, test.expectedSuggestions, suggestionsResponse.Suggestions)
 		}
 	}

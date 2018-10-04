@@ -8,9 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/go/src/pkg/bytes"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const sampleJSONResponse = `{
@@ -60,6 +62,15 @@ func (m *mockSuggestionApi) GetName() string {
 
 type mockSuggestionApiServer struct {
 	mock.Mock
+}
+
+type ClosingBuffer struct {
+	*bytes.Buffer
+}
+
+func (cb *ClosingBuffer) Close() (err error) {
+	// do nothing
+	return
 }
 
 func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server {
@@ -319,9 +330,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	suggestionApi := new(mockSuggestionApi)
 	mockClient := new(mockHttpClient)
-	mockConcordance := &ConcordanceService{"concordanceBaseURL", "concordanceEndpoint", mockClient}
-
-	mockBody := new(mockResponseBody)
+	mockConcordance := &ConcordanceService{"ConcordanceBaseURL", "ConcordanceEndpoint", mockClient}
 
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
@@ -332,11 +341,23 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: mockBody}, nil)
-	mockBody.On("Read", mock.AnythingOfType("[]uint8")).Return(0, nil)
-	mockBody.On("Close").Return(nil)
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: personType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: personType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
 
-	aggregateSuggester := NewAggregateSuggester(*mockConcordance, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
@@ -353,7 +374,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	mockConcordance := new(ConcordanceService)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
-	aggregateSuggester := NewAggregateSuggester(*mockConcordance, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 0)
@@ -366,14 +387,27 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	mockClient := new(mockHttpClient)
-	mockConcordance := &ConcordanceService{"concordanceBaseURL", "concordanceEndpoint", mockClient}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(mock.AnythingOfType("*http.Response"), nil)
+	mockConcordance := &ConcordanceService{"ConcordanceBaseURL", "ConcordanceEndpoint", mockClient}
+
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: personType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(*mockConcordance, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 1)

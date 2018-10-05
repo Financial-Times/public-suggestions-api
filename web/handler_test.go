@@ -18,6 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	personType = "http://www.ft.com/ontology/person/Person"
+)
+
 func init() {
 	log.InitLogger("handler_test", "ERROR")
 }
@@ -76,7 +80,6 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
-	personType := "http://www.ft.com/ontology/person/Person"
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
 		{IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
 	}}
@@ -116,7 +119,6 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	personType := "http://www.ft.com/ontology/person/Person"
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
 		{IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
 	}}
@@ -289,5 +291,30 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+	mockSuggester.AssertExpectations(t)
+}
+
+func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
+	expect := assert.New(t)
+
+	body := []byte(`{"bodyXML":"Test body"}`)
+	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
+	req.Header.Add("X-Request-Id", "tid_test")
+	w := httptest.NewRecorder()
+
+	mockClient := new(mockHttpClient)
+	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
+	mockSuggester := new(mockSuggesterService)
+
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
+		{IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+	}}, nil)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
+
+	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	handler.HandleSuggestion(w, req)
+
+	expect.Equal(http.StatusServiceUnavailable, w.Code)
+	expect.Equal(`{"message": "aggregating suggestions failed!"}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }

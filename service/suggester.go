@@ -229,7 +229,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 	var concorded ConcordanceResponse
 	if len(s.Suggestions) == 0 {
-		return filtered, errors.New("Empty suggestions")
+		return filtered, nil
 	}
 
 	req, err := http.NewRequest("GET", suggester.Concordance.ConcordanceBaseURL+suggester.Concordance.ConcordanceEndpoint, nil)

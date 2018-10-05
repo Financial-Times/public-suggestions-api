@@ -243,7 +243,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 		queryParams.Add(reqParamName, fp.Base(suggestion.Id))
 	}
 
-	queryParams.Add("includeDeprecated", "false")
+	queryParams.Add("include_deprecated", "false")
 
 	req.URL.RawQuery = queryParams.Encode()
 

@@ -330,7 +330,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	suggestionApi := new(mockSuggestionApi)
 	mockClient := new(mockHttpClient)
-	mockConcordance := &ConcordanceService{"ConcordanceBaseURL", "ConcordanceEndpoint", mockClient}
+	mockConcordance := &ConcordanceService{"internal-concordances", "concept-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
 
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
@@ -387,8 +387,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	mockClient := new(mockHttpClient)
-	mockConcordance := &ConcordanceService{"ConcordanceBaseURL", "ConcordanceEndpoint", mockClient}
-
+	mockConcordance := &ConcordanceService{"internal-concordances", "concept-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}

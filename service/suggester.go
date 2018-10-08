@@ -57,9 +57,12 @@ type SuggestionApi struct {
 }
 
 type ConcordanceService struct {
+	systemId            string
+	name                string
 	ConcordanceBaseURL  string
 	ConcordanceEndpoint string
 	Client              Client
+	failureImpact       string
 }
 
 type FalconSuggester struct {
@@ -138,6 +141,9 @@ func NewConcordance(conceptConcordancesApiBaseURL, conceptConcordancesEndpoint s
 		ConcordanceBaseURL:  conceptConcordancesApiBaseURL,
 		ConcordanceEndpoint: conceptConcordancesEndpoint,
 		Client:              client,
+		name:                "concept-concordances",
+		systemId:            "internal-concordances",
+		failureImpact:       "Suggestions won't work",
 	}
 }
 
@@ -389,4 +395,37 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
 	}
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
+}
+
+func (concordance *ConcordanceService) Check() health.Check {
+	return health.Check{
+		ID:               concordance.systemId,
+		BusinessImpact:   concordance.failureImpact,
+		Name:             fmt.Sprintf("%v Healthcheck", concordance.name),
+		PanicGuide:       "https://dewey.in.ft.com/view/system/internal-concordances",
+		Severity:         2,
+		TechnicalSummary: fmt.Sprintf("%v is not available", concordance.name),
+		Checker:          concordance.healthCheck,
+	}
+}
+
+func (concordance *ConcordanceService) healthCheck() (string, error) {
+	req, err := http.NewRequest("GET", concordance.ConcordanceBaseURL+"/__gtg", nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Add("User-Agent", "UPP internal-concordances")
+
+	resp, err := concordance.Client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
+	}
+	return fmt.Sprintf("%v is healthy", concordance.name), nil
 }

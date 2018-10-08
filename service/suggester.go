@@ -187,7 +187,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	for i := 0; i < len(suggester.Suggesters); i++ {
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
 	}
-	return suggester.filterByInternalConcordances(aggregateResp)
+	return suggester.filterByInternalConcordances(aggregateResp, flags)
 }
 
 func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
@@ -231,15 +231,20 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse) (SuggestionsResponse, error) {
+func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse, flags SourceFlags) (SuggestionsResponse, error) {
+	if flags.Debug != "" {
+		log.WithField("debug", flags.Debug).Info("Calling internal concordances")
+	}
 	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 	var concorded ConcordanceResponse
 	if len(s.Suggestions) == 0 {
+		log.Info("No suggestions for calling internal concordances!")
 		return filtered, nil
 	}
 
 	req, err := http.NewRequest("GET", suggester.Concordance.ConcordanceBaseURL+suggester.Concordance.ConcordanceEndpoint, nil)
 	if err != nil {
+		log.WithError(err).Errorf("Error creating internal concordances request %v", err)
 		return filtered, err
 	}
 
@@ -255,17 +260,20 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 
 	resp, err := suggester.Concordance.Client.Do(req)
 	if err != nil {
+		log.WithError(err).Errorf("Error making request to internal concordances service %v", err)
 		return filtered, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		log.WithError(err).Errorf("Error reading response from internal concordances service %v", err)
 		return filtered, err
 	}
 
 	err = json.Unmarshal(body, &concorded)
 	if err != nil {
+		log.WithError(err).Errorf("Error unmarshalling response from internal concordances service %v", err)
 		return filtered, err
 	}
 

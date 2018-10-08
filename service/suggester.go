@@ -18,6 +18,10 @@ const (
 	ontologyLocationType     = "http://www.ft.com/ontology/Location"
 	ontologyOrganisationType = "http://www.ft.com/ontology/organisation/Organisation"
 
+	ontologyPublicCompanyType  = "http://www.ft.com/ontology/company/PublicCompany"
+	ontologyPrivateCompanyType = "http://www.ft.com/ontology/company/PrivateCompany"
+	ontologyCompanyType        = "http://www.ft.com/ontology/company/Company"
+
 	predicateHasAuthor = "http://www.ft.com/ontology/annotation/hasAuthor"
 
 	TmeSource = "tme"
@@ -44,7 +48,10 @@ var (
 
 		},
 		ConceptTypeOrganisation: func(value Suggestion) bool {
-			return value.SuggestionType == ontologyOrganisationType
+			return value.SuggestionType == ontologyOrganisationType ||
+				value.SuggestionType == ontologyPublicCompanyType ||
+				value.SuggestionType == ontologyPrivateCompanyType ||
+				value.SuggestionType == ontologyCompanyType
 		},
 		PseudoConceptTypeAuthor: func(value Suggestion) bool {
 			return value.SuggestionType == ontologyPersonType && value.Predicate == predicateHasAuthor

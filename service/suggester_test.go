@@ -714,6 +714,131 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 	}
 }
 
+// This is about the other concept types that should be handled as organisations (PublicCompany, PrivateCompany, Company)
+func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
+	expect := assert.New(t)
+
+	falconSuggestions := `{  
+		"suggestions":[  
+		  {  
+			"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			"apiUrl":"http://api.ft.com/things/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			"prefLabel":"London Politics",
+			"type":"http://www.ft.com/ontology/Topic"
+		  },
+		  {  
+			"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+			"apiUrl":"http://api.ft.com/things/9332270e-f959-3f55-9153-d30acd0d0a50",
+			"prefLabel":"Apple",
+			"type":"http://www.ft.com/ontology/organisation/Organisation"
+		  },
+		  {  
+			"id":"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
+			"apiUrl":"http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
+			"prefLabel":"Facebook",
+			"type":"http://www.ft.com/ontology/company/PrivateCompany"
+		  },
+		  {  
+			"id":"http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
+			"apiUrl":"http://api.ft.com/things/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
+			"prefLabel":"CIA",
+			"type":"http://www.ft.com/ontology/company/PublicCompany"
+		  },
+		  {  
+			"id":"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
+			"apiUrl":"http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
+			"prefLabel":"ABC",
+			"type":"http://www.ft.com/ontology/company/Company"
+		  }
+		]
+	  }`
+	ontotextSuggestions := `{  
+		"suggestions":[
+		  {  
+			"id":"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
+			"apiUrl":"http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
+			"prefLabel":"CIA",
+			"type":"http://www.ft.com/ontology/company/PublicCompany"
+		  },
+		  {  
+			"id":"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
+			"apiUrl":"http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
+			"prefLabel":"ABC",
+			"type":"http://www.ft.com/ontology/company/Company"
+		  }
+		]
+	  }`
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	tests := []struct {
+		testName      string
+		expectedUUIDs []string
+		flags         map[string]string
+	}{
+		{
+			testName: "withoutFlags",
+			flags:    defaultConceptsSources,
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				"http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
+				"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
+				"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
+			},
+		},
+		{
+			testName: "fromCesOrganisations",
+			flags: map[string]string{
+				ConceptTypeLocation:     TmeSource,
+				ConceptTypePerson:       TmeSource,
+				ConceptTypeOrganisation: CesSource,
+			},
+			expectedUUIDs: []string{
+				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
+				"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		falconHTTPMock := new(mockHttpClient)
+		falconHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(strings.NewReader(falconSuggestions)),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		ontotextHTTPMock := new(mockHttpClient)
+		ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(strings.NewReader(ontotextSuggestions)),
+			StatusCode: http.StatusOK,
+		}, nil)
+
+		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
+		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
+		aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, falconSuggester, ontotextSuggester)
+
+		suggestionResp := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
+
+		actualSuggestions := suggestionResp.Suggestions
+		expect.NotNilf(actualSuggestions, "%s -> nil suggestions", testCase.testName)
+		expect.Lenf(actualSuggestions, len(testCase.expectedUUIDs), "%s -> unexpected number of suggestions", testCase.testName)
+
+		for _, expectedID := range testCase.expectedUUIDs {
+			found := false
+			for _, actualSugg := range actualSuggestions {
+				if expectedID == actualSugg.Id {
+					found = true
+					break
+				}
+			}
+			if !found {
+				expect.Failf("expected suggestion not returned", "%s -> %s missing", testCase.testName, expectedID)
+			}
+		}
+	}
+}
+
 func TestOntotext_MissingDefaultValues(t *testing.T) {
 	expect := assert.New(t)
 

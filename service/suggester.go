@@ -258,6 +258,9 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 
 	req.URL.RawQuery = queryParams.Encode()
 
+	req.Header.Add("User-Agent", "UPP internal-concordances")
+	req.Header.Add("X-Request-Id", tid)
+
 	resp, err := suggester.Concordance.Client.Do(req)
 	if err != nil {
 		log.WithTransactionID(tid).WithError(err).Errorf("Error making request to internal concordances service %v", err)

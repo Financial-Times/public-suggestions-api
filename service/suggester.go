@@ -247,9 +247,6 @@ func filterOutConcepts(resp SuggestionsResponse, conceptTypesSources map[string]
 }
 
 func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
-	if flags.Debug != "" {
-		log.WithField("Flags", flags.Flags).Info("Ontotext called")
-	}
 	suggestions, err := suggester.SuggestionApi.GetSuggestions(payload, tid, flags)
 	if err != nil {
 		return suggestions, err
@@ -265,9 +262,6 @@ func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, fla
 }
 
 func (suggester *OntotextSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
-	if flags.Debug != "" {
-		log.WithField("Flags", flags.Flags).Info("Ontotext called")
-	}
 	suggestions, err := suggester.SuggestionApi.GetSuggestions(payload, tid, flags)
 	if err != nil {
 		return suggestions, err
@@ -282,7 +276,13 @@ func (suggester *OntotextSuggester) GetSuggestions(payload []byte, tid string, f
 }
 
 func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+	if flags.Debug != "" {
+		log.WithField("Flags", flags.Flags).Infof("%s called", suggester.GetName())
+	}
 	if !suggester.requestAnyway && !flags.hasFlag(suggester.sourceName, suggester.targetedConceptTypes) {
+		if flags.Debug != "" {
+			log.WithField("Flags", flags.Flags).Infof("%s skipped because of the flags", suggester.GetName())
+		}
 		return SuggestionsResponse{make([]Suggestion, 0)}, nil
 	}
 

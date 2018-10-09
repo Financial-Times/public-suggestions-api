@@ -12,12 +12,13 @@ import (
 	"net/http/httptest"
 	"strings"
 
+	"sort"
+
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sort"
 )
 
 func TestMainApp(t *testing.T) {
@@ -74,20 +75,24 @@ func TestRequestHandler_all(t *testing.T) {
 
 	expectedSuggestions := []service.Suggestion{
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: service.Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			PrefLabel:      "Lawrence Summers",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     true,
+			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
+			Concept: service.Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
 		},
 	}
 	tests := []struct {
@@ -190,7 +195,6 @@ func TestRequestHandler_all(t *testing.T) {
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
 	}()
-	time.Sleep(time.Microsecond * 5000)
 	client := &http.Client{}
 
 	for _, test := range tests {
@@ -209,7 +213,7 @@ func TestRequestHandler_all(t *testing.T) {
 			json.Unmarshal(rBody, &suggestionsResponse)
 			suggestions := suggestionsResponse.Suggestions
 			sort.Slice(suggestions, func(i, j int) bool {
-				return suggestions[i].Id < suggestions[j].Id
+				return suggestions[i].Concept.ID < suggestions[j].Concept.ID
 			})
 			assert.Equal(t, test.expectedSuggestions, suggestionsResponse.Suggestions)
 		}

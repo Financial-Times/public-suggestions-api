@@ -74,12 +74,8 @@ type AuthorsSuggester struct {
 }
 
 type Suggestion struct {
-	Predicate      string `json:"predicate,omitempty"`
-	Id             string `json:"id,omitempty"`
-	ApiUrl         string `json:"apiUrl,omitempty"`
-	PrefLabel      string `json:"prefLabel,omitempty"`
-	SuggestionType string `json:"type,omitempty"`
-	IsFTAuthor     bool   `json:"isFTAuthor,omitempty"`
+	Concept
+	Predicate string `json:"predicate,omitempty"`
 }
 
 type Concept struct {
@@ -187,7 +183,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	for i := 0; i < len(suggester.Suggesters); i++ {
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
 	}
-	return suggester.filterByInternalConcordances(aggregateResp, tid, flags)
+	return suggester.filterByInternalConcordances(aggregateResp, tid, flags.Debug)
 }
 
 func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
@@ -231,9 +227,9 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse, tid string, flags SourceFlags) (SuggestionsResponse, error) {
-	if flags.Debug != "" {
-		log.WithField("debug", flags.Debug).Info("Calling internal concordances")
+func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse, tid string, flag string) (SuggestionsResponse, error) {
+	if flag != "" {
+		log.WithTransactionID(tid).WithField("debug", flag).Info("Calling internal concordances")
 	}
 	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 	var concorded ConcordanceResponse
@@ -244,52 +240,45 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 
 	req, err := http.NewRequest("GET", suggester.Concordance.ConcordanceBaseURL+suggester.Concordance.ConcordanceEndpoint, nil)
 	if err != nil {
-		log.WithTransactionID(tid).WithError(err).Errorf("Error creating internal concordances request %v", err)
 		return filtered, err
 	}
 
 	queryParams := req.URL.Query()
 
 	for _, suggestion := range s.Suggestions {
-		queryParams.Add(reqParamName, fp.Base(suggestion.Id))
+		queryParams.Add(reqParamName, fp.Base(suggestion.Concept.ID))
 	}
 
 	queryParams.Add("include_deprecated", "false")
 
 	req.URL.RawQuery = queryParams.Encode()
 
-	req.Header.Add("User-Agent", "UPP internal-concordances")
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", tid)
+	req.Header.Add("debug", flag)
 
 	resp, err := suggester.Concordance.Client.Do(req)
 	if err != nil {
-		log.WithTransactionID(tid).WithError(err).Errorf("Error making request to internal concordances service %v", err)
 		return filtered, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.WithTransactionID(tid).WithError(err).Errorf("Error reading response from internal concordances service %v", err)
 		return filtered, err
 	}
 
 	err = json.Unmarshal(body, &concorded)
 	if err != nil {
-		log.WithTransactionID(tid).WithError(err).Errorf("Error unmarshalling response from internal concordances service %v", err)
 		return filtered, err
 	}
 
 	for id, c := range concorded.Concepts {
 		for _, suggestion := range s.Suggestions {
-			if id == fp.Base(suggestion.Id) {
+			if id == fp.Base(suggestion.Concept.ID) {
 				filtered.Suggestions = append(filtered.Suggestions, Suggestion{
-					Predicate:      suggestion.Predicate,
-					Id:             c.ID,
-					ApiUrl:         c.APIURL,
-					SuggestionType: c.Type,
-					IsFTAuthor:     c.IsFTAuthor,
-					PrefLabel:      c.PrefLabel,
+					Predicate: suggestion.Predicate,
+					Concept:   c,
 				})
 				break
 			}
@@ -299,7 +288,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 }
 
 func isNotAuthor(value Suggestion) bool {
-	return !(value.SuggestionType == personType && value.Predicate == hasAuthor)
+	return !(value.Concept.Type == personType && value.Predicate == hasAuthor)
 }
 
 func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
@@ -426,7 +415,7 @@ func (concordance *ConcordanceService) healthCheck() (string, error) {
 		return "", err
 	}
 
-	req.Header.Add("User-Agent", "UPP internal-concordances")
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 
 	resp, err := concordance.Client.Do(req)
 	if err != nil {

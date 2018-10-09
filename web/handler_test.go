@@ -81,7 +81,15 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
-		{IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		service.Suggestion{
+			Concept: service.Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       personType,
+			},
+		},
 	}}
 
 	mockClient := new(mockHttpClient)
@@ -107,7 +115,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[{"id":"authors-suggestion-api","apiUrl":"apiurl2","prefLabel":"prefLabel2","type":"http://www.ft.com/ontology/person/Person","isFTAuthor":true}]}`, w.Body.String())
+	expect.Equal(`{"suggestions":[{"id":"authors-suggestion-api","apiUrl":"apiurl2","type":"http://www.ft.com/ontology/person/Person","prefLabel":"prefLabel2","isFTAuthor":true}]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
@@ -120,7 +128,15 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	w := httptest.NewRecorder()
 
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
-		{IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
+		service.Suggestion{
+			Concept: service.Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       personType,
+			},
+		},
 	}}
 
 	mockClient := new(mockHttpClient)
@@ -146,7 +162,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[{"id":"falcon-suggestion-api","apiUrl":"apiurl1","prefLabel":"prefLabel1","type":"http://www.ft.com/ontology/person/Person"}]}`, w.Body.String())
+	expect.Equal(`{"suggestions":[{"id":"falcon-suggestion-api","apiUrl":"apiurl1","type":"http://www.ft.com/ontology/person/Person","prefLabel":"prefLabel1"}]}`, w.Body.String())
 	mockSuggester.AssertExpectations(t)
 }
 
@@ -307,7 +323,15 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	mockSuggester := new(mockSuggesterService)
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
-		{IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
+		service.Suggestion{
+			Concept: service.Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       personType,
+			},
+		},
 	}}, nil)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
 

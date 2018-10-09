@@ -71,16 +71,16 @@ func main() {
 		Desc:   "The endpoint for authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
-	conceptConcordancesApiBaseURL := app.String(cli.StringOpt{
+	internalConcordancesApiBaseURL := app.String(cli.StringOpt{
 		Name:   "internal-concordances-api-base-url",
 		Value:  "http://internal-concordances:8080",
-		Desc:   "The base URL for concept concordances api",
+		Desc:   "The base URL for internal concordances api",
 		EnvVar: "CONCEPT_CONCORDANCES_API_BASE_URL",
 	})
-	conceptConcordancesEndpoint := app.String(cli.StringOpt{
+	internalConcordancesEndpoint := app.String(cli.StringOpt{
 		Name:   "internal-concordances-endpoint",
 		Value:  "/internalconcordances",
-		Desc:   "The endpoint for concept concordances api",
+		Desc:   "The endpoint for internal concordances api",
 		EnvVar: "CONCEPT_CONCORDANCES_ENDPOINT",
 	})
 
@@ -103,7 +103,7 @@ func main() {
 		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
-		concordanceService := service.NewConcordance(*conceptConcordancesApiBaseURL, *conceptConcordancesEndpoint, c)
+		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
 		suggester := service.NewAggregateSuggester(concordanceService, falconSuggester, authorsSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), concordanceService.Check())
 

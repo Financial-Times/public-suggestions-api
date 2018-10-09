@@ -132,10 +132,10 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 	}}
 }
 
-func NewConcordance(conceptConcordancesApiBaseURL, conceptConcordancesEndpoint string, client Client) *ConcordanceService {
+func NewConcordance(internalConcordancesApiBaseURL, internalConcordancesEndpoint string, client Client) *ConcordanceService {
 	return &ConcordanceService{
-		ConcordanceBaseURL:  conceptConcordancesApiBaseURL,
-		ConcordanceEndpoint: conceptConcordancesEndpoint,
+		ConcordanceBaseURL:  internalConcordancesApiBaseURL,
+		ConcordanceEndpoint: internalConcordancesEndpoint,
 		Client:              client,
 		name:                "internal-concordances",
 		systemId:            "internal-concordances",

@@ -72,13 +72,13 @@ func main() {
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
 	conceptConcordancesApiBaseURL := app.String(cli.StringOpt{
-		Name:   "concept-concordances-api-base-url",
+		Name:   "internal-concordances-api-base-url",
 		Value:  "http://internal-concordances:8080",
 		Desc:   "The base URL for concept concordances api",
 		EnvVar: "CONCEPT_CONCORDANCES_API_BASE_URL",
 	})
 	conceptConcordancesEndpoint := app.String(cli.StringOpt{
-		Name:   "concept-concordances-endpoint",
+		Name:   "internal-concordances-endpoint",
 		Value:  "/internalconcordances",
 		Desc:   "The endpoint for concept concordances api",
 		EnvVar: "CONCEPT_CONCORDANCES_ENDPOINT",

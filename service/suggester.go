@@ -137,7 +137,7 @@ func NewConcordance(conceptConcordancesApiBaseURL, conceptConcordancesEndpoint s
 		ConcordanceBaseURL:  conceptConcordancesApiBaseURL,
 		ConcordanceEndpoint: conceptConcordancesEndpoint,
 		Client:              client,
-		name:                "concept-concordances",
+		name:                "internal-concordances",
 		systemId:            "internal-concordances",
 		failureImpact:       "Suggestions won't work",
 	}

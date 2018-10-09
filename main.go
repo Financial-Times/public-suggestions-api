@@ -93,13 +93,13 @@ func main() {
 		tr := &http.Transport{
 			MaxIdleConnsPerHost: 128,
 			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
+				Timeout:   10 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).Dial,
 		}
 		c := &http.Client{
 			Transport: tr,
-			Timeout:   30 * time.Second,
+			Timeout:   10 * time.Second,
 		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)

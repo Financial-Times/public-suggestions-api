@@ -58,7 +58,13 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		sourceFlags = []string{service.TmeSource, service.AuthorsSource}
 	}
 
-	suggestions := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: sourceFlags, Debug: debug})
+	suggestions, err := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: sourceFlags, Debug: debug})
+	if err != nil {
+		errMsg := "aggregating suggestions failed!"
+		log.WithTransactionID(tid).WithError(err).Error(errMsg)
+		writeResponse(writer, http.StatusServiceUnavailable, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
+		return
+	}
 	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}

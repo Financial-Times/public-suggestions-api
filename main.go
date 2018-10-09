@@ -71,6 +71,18 @@ func main() {
 		Desc:   "The endpoint for authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
+	internalConcordancesApiBaseURL := app.String(cli.StringOpt{
+		Name:   "internal-concordances-api-base-url",
+		Value:  "http://internal-concordances:8080",
+		Desc:   "The base URL for internal concordances api",
+		EnvVar: "CONCEPT_CONCORDANCES_API_BASE_URL",
+	})
+	internalConcordancesEndpoint := app.String(cli.StringOpt{
+		Name:   "internal-concordances-endpoint",
+		Value:  "/internalconcordances",
+		Desc:   "The endpoint for internal concordances api",
+		EnvVar: "CONCEPT_CONCORDANCES_ENDPOINT",
+	})
 
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
@@ -81,18 +93,19 @@ func main() {
 		tr := &http.Transport{
 			MaxIdleConnsPerHost: 128,
 			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
+				Timeout:   10 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).Dial,
 		}
 		c := &http.Client{
 			Transport: tr,
-			Timeout:   30 * time.Second,
+			Timeout:   10 * time.Second,
 		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
-		suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
+		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
+		suggester := service.NewAggregateSuggester(concordanceService, falconSuggester, authorsSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), concordanceService.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

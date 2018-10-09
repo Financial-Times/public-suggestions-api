@@ -8,14 +8,17 @@ import (
 	"testing"
 	"time"
 
+	"net"
+	"net/http/httptest"
+	"strings"
+
+	"sort"
+
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"net/http/httptest"
-	"strings"
 )
 
 func TestMainApp(t *testing.T) {
@@ -72,20 +75,24 @@ func TestRequestHandler_all(t *testing.T) {
 
 	expectedSuggestions := []service.Suggestion{
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: service.Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			PrefLabel:      "Lawrence Summers",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     true,
+			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
+			Concept: service.Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
 		},
 	}
 	tests := []struct {
@@ -130,7 +137,28 @@ func TestRequestHandler_all(t *testing.T) {
     		        "type": "http://www.ft.com/ontology/person/Person",
     		        "isFTAuthor": true
     		    }
-    		]}`))
+			]}`))
+
+		case strings.Contains(r.RequestURI, "/internalconcordances"):
+			w.Write([]byte(`{
+				"concepts": {
+					"6f14ea94-690f-3ed4-98c7-b926683c735a": {
+						"id": "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						"apiUrl": "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						"type": "http://www.ft.com/ontology/person/Person",
+						"prefLabel": "Donald Kaberuka",
+						"isFTAuthor": false
+					},
+					"9a5e3b4a-55da-498c-816f-9c534e1392bd": {	
+						"id": "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+						"apiUrl": "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+						"type": "http://www.ft.com/ontology/person/Person",
+						"prefLabel": "Lawrence Summers",
+						"isFTAuthor": true
+					}
+				}
+    		    
+    		}`))
 
 		case strings.Contains(r.RequestURI, "/authors"):
 			w.Write([]byte(`{
@@ -158,16 +186,15 @@ func TestRequestHandler_all(t *testing.T) {
 		Transport: tr,
 		Timeout:   30 * time.Second,
 	}
-
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
-	suggester := service.NewAggregateSuggester(falconSuggester, authorsSuggester)
+	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
+	suggester := service.NewAggregateSuggester(concordance, falconSuggester, authorsSuggester)
 	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
 	}()
-
 	client := &http.Client{}
 
 	for _, test := range tests {
@@ -184,6 +211,10 @@ func TestRequestHandler_all(t *testing.T) {
 
 			suggestionsResponse := service.SuggestionsResponse{}
 			json.Unmarshal(rBody, &suggestionsResponse)
+			suggestions := suggestionsResponse.Suggestions
+			sort.Slice(suggestions, func(i, j int) bool {
+				return suggestions[i].Concept.ID < suggestions[j].Concept.ID
+			})
 			assert.Equal(t, test.expectedSuggestions, suggestionsResponse.Suggestions)
 		}
 	}

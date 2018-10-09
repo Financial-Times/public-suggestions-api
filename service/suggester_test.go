@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const sampleJSONResponse = `{
@@ -56,6 +58,15 @@ func (m *mockSuggestionApi) GetName() string {
 
 type mockSuggestionApiServer struct {
 	mock.Mock
+}
+
+type ClosingBuffer struct {
+	*bytes.Buffer
+}
+
+func (cb *ClosingBuffer) Close() (err error) {
+	// do nothing
+	return
 }
 
 func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server {
@@ -115,21 +126,25 @@ func TestFalconSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
 	expectedSuggestions := []Suggestion{
-		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+		Suggestion{
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			PrefLabel:      "Lawrence Summers",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     true,
+			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
 		},
 	}
 
@@ -312,18 +327,56 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 
 func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
+
 	suggestionApi := new(mockSuggestionApi)
+	mockClient := new(mockHttpClient)
+	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: personType},
-	}}
+		Suggestion{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       personType},
+		},
+	},
+	}
 	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
-	}}
+		Suggestion{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       personType},
+		},
+	},
+	}
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: personType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: personType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
 
@@ -336,10 +389,11 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvailable(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
+	mockConcordance := new(ConcordanceService)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 0)
 	expect.NotNil(response.Suggestions)
@@ -350,17 +404,42 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
+	mockClient := new(mockHttpClient)
+	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: personType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: personType},
-	}}, nil).Once()
+		Suggestion{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       personType,
+			},
+		},
+	},
+	}, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 1)
 
-	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+	expect.Equal(response.Suggestions[0].Concept.ID, "authors-suggestion-api")
 
 	suggestionApi.AssertExpectations(t)
 }
@@ -377,21 +456,25 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
 	expectedSuggestions := []Suggestion{
-		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+		Suggestion{
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			PrefLabel:      "Lawrence Summers",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     true,
+			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
 		},
 	}
 
@@ -419,13 +502,15 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	expect := assert.New(t)
 
 	expectedSuggestions := []Suggestion{
-		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+		Suggestion{
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 	}
 

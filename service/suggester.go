@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	fp "path/filepath"
+
+	"sync"
 
 	health "github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
-	"sync"
 )
 
 const (
@@ -18,6 +20,7 @@ const (
 	hasAuthor     = "http://www.ft.com/ontology/annotation/hasAuthor"
 	TmeSource     = "tme"
 	AuthorsSource = "authors"
+	reqParamName  = "ids"
 )
 
 var NoContentError = errors.New("Suggestion API returned HTTP 204")
@@ -39,7 +42,8 @@ type Suggester interface {
 }
 
 type AggregateSuggester struct {
-	Suggesters []Suggester
+	Concordance *ConcordanceService
+	Suggesters  []Suggester
 }
 
 type SuggestionApi struct {
@@ -52,6 +56,15 @@ type SuggestionApi struct {
 	failureImpact      string
 }
 
+type ConcordanceService struct {
+	systemId            string
+	name                string
+	ConcordanceBaseURL  string
+	ConcordanceEndpoint string
+	Client              Client
+	failureImpact       string
+}
+
 type FalconSuggester struct {
 	SuggestionApi
 }
@@ -60,22 +73,30 @@ type AuthorsSuggester struct {
 	SuggestionApi
 }
 
-type SuggestionsResponse struct {
-	Suggestions []Suggestion `json:"suggestions"`
+type Suggestion struct {
+	Concept
+	Predicate string `json:"predicate,omitempty"`
 }
 
-type Suggestion struct {
-	Predicate      string `json:"predicate,omitempty"`
-	Id             string `json:"id,omitempty"`
-	ApiUrl         string `json:"apiUrl,omitempty"`
-	PrefLabel      string `json:"prefLabel,omitempty"`
-	SuggestionType string `json:"type,omitempty"`
-	IsFTAuthor     bool   `json:"isFTAuthor,omitempty"`
+type Concept struct {
+	ID         string `json:"id"`
+	APIURL     string `json:"apiUrl,omitempty"`
+	Type       string `json:"type,omitempty"`
+	PrefLabel  string `json:"prefLabel,omitempty"`
+	IsFTAuthor bool   `json:"isFTAuthor,omitempty"`
 }
 
 type SourceFlags struct {
 	Flags []string
 	Debug string
+}
+
+type SuggestionsResponse struct {
+	Suggestions []Suggestion `json:"suggestions"`
+}
+
+type ConcordanceResponse struct {
+	Concepts map[string]Concept `json:"concepts"`
 }
 
 func (sourceFlags *SourceFlags) hasFlag(value string) bool {
@@ -111,11 +132,22 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 	}}
 }
 
-func NewAggregateSuggester(suggesters ...Suggester) *AggregateSuggester {
-	return &AggregateSuggester{suggesters}
+func NewConcordance(internalConcordancesApiBaseURL, internalConcordancesEndpoint string, client Client) *ConcordanceService {
+	return &ConcordanceService{
+		ConcordanceBaseURL:  internalConcordancesApiBaseURL,
+		ConcordanceEndpoint: internalConcordancesEndpoint,
+		Client:              client,
+		name:                "internal-concordances",
+		systemId:            "internal-concordances",
+		failureImpact:       "Suggestions won't work",
+	}
 }
 
-func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) SuggestionsResponse {
+func NewAggregateSuggester(concordance *ConcordanceService, suggesters ...Suggester) *AggregateSuggester {
+	return &AggregateSuggester{concordance, suggesters}
+}
+
+func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
 	data, err := getXmlSuggestionRequestFromJson(payload)
 	if flags.Debug != "" {
 		log.WithTransactionID(tid).WithField("debug", flags.Debug).Info(string(data))
@@ -151,24 +183,114 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	for i := 0; i < len(suggester.Suggesters); i++ {
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
 	}
-
-	return aggregateResp
+	return suggester.filterByInternalConcordances(aggregateResp, tid, flags.Debug)
 }
 
-func filterOutAuthors(resp SuggestionsResponse) []Suggestion {
-	i := 0
-	for _, value := range resp.Suggestions {
-		if isNotAuthor(value) {
-			//retain suggestion
-			resp.Suggestions[i] = value
-			i++
+func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
+
+	var jsonInput JsonInput
+
+	err := json.Unmarshal(jsonData, &jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonInput.Byline = TransformText(jsonInput.Byline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Body = TransformText(jsonInput.Body,
+		PullTagTransformer,
+		WebPullTagTransformer,
+		TableTagTransformer,
+		PromoBoxTagTransformer,
+		WebInlinePictureTagTransformer,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Headline = TransformText(jsonInput.Headline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+
+	data, err := json.Marshal(jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse, tid string, debugFlag string) (SuggestionsResponse, error) {
+	if debugFlag != "" {
+		log.WithTransactionID(tid).WithField("debug", debugFlag).Info("Calling internal concordances")
+	}
+	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
+	var concorded ConcordanceResponse
+	if len(s.Suggestions) == 0 {
+		log.WithTransactionID(tid).Info("No suggestions for calling internal concordances!")
+		return filtered, nil
+	}
+
+	req, err := http.NewRequest("GET", suggester.Concordance.ConcordanceBaseURL+suggester.Concordance.ConcordanceEndpoint, nil)
+	if err != nil {
+		return filtered, err
+	}
+
+	queryParams := req.URL.Query()
+
+	for _, suggestion := range s.Suggestions {
+		queryParams.Add(reqParamName, fp.Base(suggestion.Concept.ID))
+	}
+
+	queryParams.Add("include_deprecated", "false")
+
+	req.URL.RawQuery = queryParams.Encode()
+
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
+	req.Header.Add("X-Request-Id", tid)
+	if debugFlag != "" {
+		req.Header.Add("debug", debugFlag)
+	}
+
+	resp, err := suggester.Concordance.Client.Do(req)
+	if err != nil {
+		return filtered, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return filtered, err
+	}
+
+	err = json.Unmarshal(body, &concorded)
+	if err != nil {
+		return filtered, err
+	}
+
+	for id, c := range concorded.Concepts {
+		for _, suggestion := range s.Suggestions {
+			if id == fp.Base(suggestion.Concept.ID) {
+				filtered.Suggestions = append(filtered.Suggestions, Suggestion{
+					Predicate: suggestion.Predicate,
+					Concept:   c,
+				})
+				break
+			}
 		}
 	}
-	return resp.Suggestions[:i]
+	return filtered, nil
 }
 
 func isNotAuthor(value Suggestion) bool {
-	return !(value.SuggestionType == personType && value.Predicate == hasAuthor)
+	return !(value.Concept.Type == personType && value.Predicate == hasAuthor)
 }
 
 func (suggester *FalconSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
@@ -228,6 +350,18 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags
 	return response, nil
 }
 
+func filterOutAuthors(resp SuggestionsResponse) []Suggestion {
+	i := 0
+	for _, value := range resp.Suggestions {
+		if isNotAuthor(value) {
+			//retain suggestion
+			resp.Suggestions[i] = value
+			i++
+		}
+	}
+	return resp.Suggestions[:i]
+}
+
 func (suggester *SuggestionApi) GetName() string {
 	return suggester.name
 }
@@ -265,43 +399,35 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
 }
 
-func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
+func (concordance *ConcordanceService) Check() health.Check {
+	return health.Check{
+		ID:               concordance.systemId,
+		BusinessImpact:   concordance.failureImpact,
+		Name:             fmt.Sprintf("%v Healthcheck", concordance.name),
+		PanicGuide:       "https://dewey.in.ft.com/view/system/internal-concordances",
+		Severity:         2,
+		TechnicalSummary: fmt.Sprintf("%v is not available", concordance.name),
+		Checker:          concordance.healthCheck,
+	}
+}
 
-	var jsonInput JsonInput
-
-	err := json.Unmarshal(jsonData, &jsonInput)
+func (concordance *ConcordanceService) healthCheck() (string, error) {
+	req, err := http.NewRequest("GET", concordance.ConcordanceBaseURL+"/__gtg", nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	jsonInput.Byline = TransformText(jsonInput.Byline,
-		HtmlEntityTransformer,
-		TagsRemover,
-		OuterSpaceTrimmer,
-		DuplicateWhiteSpaceRemover,
-	)
-	jsonInput.Body = TransformText(jsonInput.Body,
-		PullTagTransformer,
-		WebPullTagTransformer,
-		TableTagTransformer,
-		PromoBoxTagTransformer,
-		WebInlinePictureTagTransformer,
-		HtmlEntityTransformer,
-		TagsRemover,
-		OuterSpaceTrimmer,
-		DuplicateWhiteSpaceRemover,
-	)
-	jsonInput.Headline = TransformText(jsonInput.Headline,
-		HtmlEntityTransformer,
-		TagsRemover,
-		OuterSpaceTrimmer,
-		DuplicateWhiteSpaceRemover,
-	)
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 
-	data, err := json.Marshal(jsonInput)
+	resp, err := concordance.Client.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return data, nil
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
+	}
+	return fmt.Sprintf("%v is healthy", concordance.name), nil
 }

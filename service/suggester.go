@@ -227,9 +227,9 @@ func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse, tid string, flag string) (SuggestionsResponse, error) {
-	if flag != "" {
-		log.WithTransactionID(tid).WithField("debug", flag).Info("Calling internal concordances")
+func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsResponse, tid string, debugFlag string) (SuggestionsResponse, error) {
+	if debugFlag != "" {
+		log.WithTransactionID(tid).WithField("debug", debugFlag).Info("Calling internal concordances")
 	}
 	var filtered = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 	var concorded ConcordanceResponse
@@ -255,7 +255,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", tid)
-	req.Header.Add("debug", flag)
+	req.Header.Add("debug", debugFlag)
 
 	resp, err := suggester.Concordance.Client.Do(req)
 	if err != nil {

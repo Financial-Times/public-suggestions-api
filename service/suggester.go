@@ -255,7 +255,9 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", tid)
-	req.Header.Add("debug", debugFlag)
+	if debugFlag != "" {
+		req.Header.Add("debug", debugFlag)
+	}
 
 	resp, err := suggester.Concordance.Client.Do(req)
 	if err != nil {

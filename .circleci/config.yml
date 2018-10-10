@@ -63,6 +63,9 @@ jobs:
         environment:
           GOPATH: /go
           FALCON_SUGGESTION_API_BASE_URL: http://localhost:9000
+          AUTHORS_SUGGESTION_API_BASE_URL: http://localhost:9000
+          ONTOTEXT_SUGGESTION_API_BASE_URL: http://localhost:9000
+          CONCEPT_CONCORDANCES_API_BASE_URL: http://localhost:9000
       - image: peteclarkft/ersatz:stable
     steps:
       - checkout

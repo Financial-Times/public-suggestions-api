@@ -84,6 +84,19 @@ func main() {
 		EnvVar: "ONTOTEXT_SUGGESTION_ENDPOINT",
 	})
 
+	internalConcordancesApiBaseURL := app.String(cli.StringOpt{
+		Name:   "internal-concordances-api-base-url",
+		Value:  "http://internal-concordances:8080",
+		Desc:   "The base URL for internal concordances api",
+		EnvVar: "CONCEPT_CONCORDANCES_API_BASE_URL",
+	})
+	internalConcordancesEndpoint := app.String(cli.StringOpt{
+		Name:   "internal-concordances-endpoint",
+		Value:  "/internalconcordances",
+		Desc:   "The endpoint for internal concordances api",
+		EnvVar: "CONCEPT_CONCORDANCES_ENDPOINT",
+	})
+
 	defaultSourcePerson := app.String(cli.StringOpt{
 		Name:   "default-source-person",
 		Value:  "tme",
@@ -112,13 +125,13 @@ func main() {
 		tr := &http.Transport{
 			MaxIdleConnsPerHost: 128,
 			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
+				Timeout:   10 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).Dial,
 		}
 		c := &http.Client{
 			Transport: tr,
-			Timeout:   30 * time.Second,
+			Timeout:   10 * time.Second,
 		}
 
 		defaultSources := map[string]string{
@@ -129,8 +142,10 @@ func main() {
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
 		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
-		suggester := service.NewAggregateSuggester(defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check())
+
+		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
+		suggester := service.NewAggregateSuggester(concordanceService, defaultSources, falconSuggester, authorsSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

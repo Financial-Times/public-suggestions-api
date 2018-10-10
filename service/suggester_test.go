@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 const sampleJSONResponse = `{
@@ -121,6 +124,15 @@ type mockSuggestionApiServer struct {
 	mock.Mock
 }
 
+type ClosingBuffer struct {
+	*bytes.Buffer
+}
+
+func (cb *ClosingBuffer) Close() (err error) {
+	// do nothing
+	return
+}
+
 func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server {
 	router := mux.NewRouter()
 	router.HandleFunc("/content/suggest", func(w http.ResponseWriter, r *http.Request) {
@@ -184,20 +196,24 @@ func TestFalconSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) 
 
 	expectedSuggestions := []Suggestion{
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			PrefLabel:      "Lawrence Summers",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     true,
+			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
 		},
 	}
 
@@ -382,22 +398,124 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
+func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
+	expect := assert.New(t)
+
+	suggestionApi := new(mockSuggestionApi)
+	mockClient := new(mockHttpClient)
+	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+
+	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		Suggestion{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       ontologyPersonType},
+		},
+	},
+	}
+	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		Suggestion{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType},
+		},
+	},
+	}
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+
+	expect.Len(response.Suggestions, 2)
+
+	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
+	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
+
+	suggestionApi.AssertExpectations(t)
+}
+
 func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: false, Id: "falcon-suggestion-api", ApiUrl: "apiurl1", PrefLabel: "prefLabel1", SuggestionType: ontologyPersonType},
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       ontologyPersonType,
+			},
+		},
 	}}
 	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: ontologyPersonType},
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType,
+			},
+		},
 	}}
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 
 	defaultConceptsSources := buildDefaultConceptSources()
-	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+
+	mockClient := new(mockHttpClient)
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
+	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+
+	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
 
 	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
@@ -409,6 +527,7 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
+	// create falcon response mock
 	falconMock := new(mockHttpClient)
 	falconMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
@@ -433,7 +552,8 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 	authorsMock := new(mockHttpClient)
-	// authors
+
+	// authors response mock
 	authorsMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{
@@ -443,35 +563,82 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 						"id":             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260",
 						"apiUrl":         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139260",
 						"prefLabel":      "Lawrence Summers",
-						"type":           "http://www.ft.com/ontology/person/Person"
+						"type":           "http://www.ft.com/ontology/person/Person",
+						"isFTAuthor":		true
 					}
 				]
 			}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
 
+	// mock internal concordances response
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: map[string]Concept{
+			"9a5e3b4a-55da-498c-816f-9c534e1392b5": Concept{
+				ID:        "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5",
+				APIURL:    "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b5",
+				PrefLabel: "Lawrence Summers",
+				Type:      "http://www.ft.com/ontology/person/Person",
+			},
+			"9a5e3b4a-55da-498c-816f-9c534e139260": Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139260",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
+		},
+	}
+
+	mockClient := new(mockHttpClient)
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	req, err := http.NewRequest("GET", "ConcordanceBaseURL/ConcordanceEndpoint", nil)
+	expect.NoError(err)
+
+	queryParams := req.URL.Query()
+	queryParams.Add(reqParamName, "9a5e3b4a-55da-498c-816f-9c534e1392b5")
+	queryParams.Add(reqParamName, "9a5e3b4a-55da-498c-816f-9c534e139260")
+	queryParams.Add("include_deprecated", "false")
+	req.URL.RawQuery = queryParams.Encode()
+
+	req.Header.Add("User-Agent", "UPP public-suggestions-api")
+	req.Header.Add("X-Request-Id", "tid_test")
+	mockClient.On("Do", req).Return(&http.Response{Body: buffer}, nil)
+
+	// create all the services
+	defaultConceptsSources := buildDefaultConceptSources()
 	falconSuggester := NewFalconSuggester("falconUrl", "falconEndpoint", falconMock)
 	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
+	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "/ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, authorsSuggester)
 
-	defaultConceptsSources := buildDefaultConceptSources()
-	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, falconSuggester, authorsSuggester)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
+	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
 
-	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5", response.Suggestions[0].Id)
-	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260", response.Suggestions[1].Id)
+	sort.Slice(response.Suggestions, func(i, j int) bool {
+		return response.Suggestions[i].Concept.ID < response.Suggestions[j].Concept.ID
+	})
+	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260", response.Suggestions[0].ID)
+	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5", response.Suggestions[1].ID)
 }
 
 func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvailable(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
+	mockConcordance := new(ConcordanceService)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
 	defaultConceptsSources := buildDefaultConceptSources()
-	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
+	expect.NoError(err)
 	expect.Len(response.Suggestions, 0)
 	expect.NotNil(response.Suggestions)
 
@@ -480,19 +647,46 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 
 func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testing.T) {
 	expect := assert.New(t)
+
 	suggestionApi := new(mockSuggestionApi)
+	mockClient := new(mockHttpClient)
+	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
-		{Predicate: "predicate", IsFTAuthor: true, Id: "authors-suggestion-api", ApiUrl: "apiurl2", PrefLabel: "prefLabel2", SuggestionType: ontologyPersonType},
-	}}, nil).Once()
+		Suggestion{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType,
+			},
+		},
+	},
+	}, nil).Once()
 
 	defaultConceptsSources := buildDefaultConceptSources()
-	aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, suggestionApi, suggestionApi)
-	response := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
+	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
-	expect.Equal(response.Suggestions[0].Id, "authors-suggestion-api")
+	expect.Equal(response.Suggestions[0].Concept.ID, "authors-suggestion-api")
 
 	suggestionApi.AssertExpectations(t)
 }
@@ -511,20 +705,24 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	expectedSuggestions := []Suggestion{
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/hasAuthor",
-			Id:             "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			ApiUrl:         "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
-			PrefLabel:      "Lawrence Summers",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     true,
+			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392bd",
+				PrefLabel:  "Lawrence Summers",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: true,
+			},
 		},
 	}
 
@@ -554,12 +752,14 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 
 	expectedSuggestions := []Suggestion{
 		{
-			Predicate:      "http://www.ft.com/ontology/annotation/mentions",
-			Id:             "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			ApiUrl:         "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-			PrefLabel:      "Donald Kaberuka",
-			SuggestionType: "http://www.ft.com/ontology/person/Person",
-			IsFTAuthor:     false,
+			Predicate: "http://www.ft.com/ontology/annotation/mentions",
+			Concept: Concept{
+				ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+				PrefLabel:  "Donald Kaberuka",
+				Type:       "http://www.ft.com/ontology/person/Person",
+				IsFTAuthor: false,
+			},
 		},
 	}
 
@@ -590,9 +790,10 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 	defaultConceptsSources := buildDefaultConceptSources()
 
 	tests := []struct {
-		testName      string
-		expectedUUIDs []string
-		flags         map[string]string
+		testName                     string
+		expectedUUIDs                []string
+		internalConcordancesConcepts map[string]Concept
+		flags                        map[string]string
 	}{
 		{
 			testName: "withoutFlags",
@@ -601,6 +802,32 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
 				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
 				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			},
+			internalConcordancesConcepts: map[string]Concept{
+				"f758ef56-c40a-3162-91aa-3e8a3aabc490": Concept{
+					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					PrefLabel: "London",
+					Type:      "http://www.ft.com/ontology/Location",
+				},
+				"64302452-e369-4ddb-88fa-9adc5124a380": Concept{
+					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
+					PrefLabel: "Eric Platt",
+					Type:      "http://www.ft.com/ontology/person/Person",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a50": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
 			},
 			flags: defaultConceptsSources,
 		},
@@ -611,6 +838,32 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
 				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
 				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+			},
+			internalConcordancesConcepts: map[string]Concept{
+				"f758ef56-c40a-3162-91aa-3e8a3aabc490": Concept{
+					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					PrefLabel: "London",
+					Type:      "http://www.ft.com/ontology/Location",
+				},
+				"64302452-e369-4ddb-88fa-9adc5124a380": Concept{
+					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
+					PrefLabel: "Eric Platt",
+					Type:      "http://www.ft.com/ontology/person/Person",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a50": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
 			},
 			flags: map[string]string{
 				ConceptTypePerson:       TmeSource,
@@ -626,6 +879,32 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
 				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
 			},
+			internalConcordancesConcepts: map[string]Concept{
+				"f758ef56-c40a-3162-91aa-3e8a3aabc495": Concept{
+					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+					PrefLabel: "London",
+					Type:      "http://www.ft.com/ontology/Location",
+				},
+				"64302452-e369-4ddb-88fa-9adc5124a385": Concept{
+					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
+					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385",
+					PrefLabel: "Eric Platt",
+					Type:      "http://www.ft.com/ontology/person/Person",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a55": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
+			},
 			flags: map[string]string{
 				ConceptTypePerson:       CesSource,
 				ConceptTypeLocation:     CesSource,
@@ -639,6 +918,32 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
 				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
 				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
+			},
+			internalConcordancesConcepts: map[string]Concept{
+				"f758ef56-c40a-3162-91aa-3e8a3aabc490": Concept{
+					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					PrefLabel: "London",
+					Type:      "http://www.ft.com/ontology/Location",
+				},
+				"64302452-e369-4ddb-88fa-9adc5124a385": Concept{
+					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
+					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385",
+					PrefLabel: "Eric Platt",
+					Type:      "http://www.ft.com/ontology/person/Person",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a50": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
 			},
 			flags: map[string]string{
 				ConceptTypePerson:       CesSource,
@@ -654,6 +959,32 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
 				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
 			},
+			internalConcordancesConcepts: map[string]Concept{
+				"f758ef56-c40a-3162-91aa-3e8a3aabc495": Concept{
+					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
+					PrefLabel: "London",
+					Type:      "http://www.ft.com/ontology/Location",
+				},
+				"64302452-e369-4ddb-88fa-9adc5124a380": Concept{
+					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
+					PrefLabel: "Eric Platt",
+					Type:      "http://www.ft.com/ontology/person/Person",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a50": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
+			},
 			flags: map[string]string{
 				ConceptTypePerson:       TmeSource,
 				ConceptTypeLocation:     CesSource,
@@ -667,6 +998,32 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
 				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
 				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+			},
+			internalConcordancesConcepts: map[string]Concept{
+				"f758ef56-c40a-3162-91aa-3e8a3aabc490": Concept{
+					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
+					PrefLabel: "London",
+					Type:      "http://www.ft.com/ontology/Location",
+				},
+				"64302452-e369-4ddb-88fa-9adc5124a380": Concept{
+					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
+					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
+					PrefLabel: "Eric Platt",
+					Type:      "http://www.ft.com/ontology/person/Person",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a55": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
 			},
 			flags: map[string]string{
 				ConceptTypePerson:       TmeSource,
@@ -689,11 +1046,26 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 			StatusCode: http.StatusOK,
 		}, nil)
 
+		mockClient := new(mockHttpClient)
+
+		internalConcordancesResponse := ConcordanceResponse{
+			Concepts: testCase.internalConcordancesConcepts,
+		}
+		expectedBody, err := json.Marshal(internalConcordancesResponse)
+		expect.NoError(err)
+		buffer := &ClosingBuffer{
+			Buffer: bytes.NewBuffer(expectedBody),
+		}
+		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
+		mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "/ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
-		aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, falconSuggester, ontotextSuggester)
+		aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, ontotextSuggester)
 
-		suggestionResp := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
+		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
+		expect.NoError(err)
 
 		actualSuggestions := suggestionResp.Suggestions
 		expect.NotNilf(actualSuggestions, "%s -> nil suggestions", testCase.testName)
@@ -702,7 +1074,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 		for _, expectedID := range testCase.expectedUUIDs {
 			found := false
 			for _, actualSugg := range actualSuggestions {
-				if expectedID == actualSugg.Id {
+				if expectedID == actualSugg.ID {
 					found = true
 					break
 				}
@@ -771,9 +1143,10 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 	defaultConceptsSources := buildDefaultConceptSources()
 
 	tests := []struct {
-		testName      string
-		expectedUUIDs []string
-		flags         map[string]string
+		testName                     string
+		expectedUUIDs                []string
+		flags                        map[string]string
+		internalConcordancesConcepts map[string]Concept
 	}{
 		{
 			testName: "withoutFlags",
@@ -784,6 +1157,38 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 				"http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
 				"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
 				"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
+			},
+			internalConcordancesConcepts: map[string]Concept{
+				"70121ea5-caf8-11e8-b0db-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
+					PrefLabel: "ABC",
+					Type:      "http://www.ft.com/ontology/company/Company",
+				},
+				"ec0307f0-caf7-11e8-a9b5-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
+					PrefLabel: "Facebook",
+					Type:      "http://www.ft.com/ontology/company/PrivateCompany",
+				},
+				"0767212c-caf9-11e8-b2ed-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/things/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
+					PrefLabel: "CIA",
+					Type:      "http://www.ft.com/ontology/company/PublicCompany",
+				},
+				"9332270e-f959-3f55-9153-d30acd0d0a50": Concept{
+					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
+					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
+					PrefLabel: "Apple",
+					Type:      "http://www.ft.com/ontology/organisation/Organisation",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
 			},
 		},
 		{
@@ -797,6 +1202,26 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
 				"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
 				"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
+			},
+			internalConcordancesConcepts: map[string]Concept{
+				"70121ea5-caf8-11e8-b0db-6c96cfdf3995": Concept{
+					ID:        "http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
+					APIURL:    "http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
+					PrefLabel: "ABC",
+					Type:      "http://www.ft.com/ontology/company/Company",
+				},
+				"ec0307f0-caf7-11e8-a9b5-6c96cfdf3995": Concept{
+					ID:        "http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
+					APIURL:    "http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
+					PrefLabel: "Facebook",
+					Type:      "http://www.ft.com/ontology/company/PrivateCompany",
+				},
+				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": Concept{
+					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					PrefLabel: "London Politics",
+					Type:      "http://www.ft.com/ontology/Topic",
+				},
 			},
 		},
 	}
@@ -814,11 +1239,25 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 			StatusCode: http.StatusOK,
 		}, nil)
 
+		mockClient := new(mockHttpClient)
+		internalConcordancesResponse := ConcordanceResponse{
+			Concepts: testCase.internalConcordancesConcepts,
+		}
+		expectedBody, err := json.Marshal(internalConcordancesResponse)
+		expect.NoError(err)
+		buffer := &ClosingBuffer{
+			Buffer: bytes.NewBuffer(expectedBody),
+		}
+		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+
+		mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
-		aggregateSuggester := NewAggregateSuggester(defaultConceptsSources, falconSuggester, ontotextSuggester)
+		aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, ontotextSuggester)
 
-		suggestionResp := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
+		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
+		expect.NoError(err)
 
 		actualSuggestions := suggestionResp.Suggestions
 		expect.NotNilf(actualSuggestions, "%s -> nil suggestions", testCase.testName)
@@ -827,7 +1266,7 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 		for _, expectedID := range testCase.expectedUUIDs {
 			found := false
 			for _, actualSugg := range actualSuggestions {
-				if expectedID == actualSugg.Id {
+				if expectedID == actualSugg.ID {
 					found = true
 					break
 				}

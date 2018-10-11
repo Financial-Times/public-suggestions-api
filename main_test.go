@@ -385,7 +385,6 @@ func TestRequestHandler_all(t *testing.T) {
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
 	}()
-
 	client := &http.Client{}
 
 	for _, test := range tests {

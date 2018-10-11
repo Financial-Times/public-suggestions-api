@@ -48,7 +48,6 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 	}
 
 	defaultValues, err := prepareTypesSource(request, handler.Suggester.DefaultSource)
-	// sourceFlags, found, err := util.GetMultipleValueQueryParameter(request, "source", service.TmeSource, service.AuthorsSource)
 	if err != nil {
 		errMsg := fmt.Sprintf("source flag incorrectly set. Accepted values are: %s, %s", service.CesSource, service.TmeSource)
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)
@@ -57,6 +56,7 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 	}
 
 	suggestions, err := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: defaultValues, Debug: debug})
+
 	if err != nil {
 		errMsg := "aggregating suggestions failed!"
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)

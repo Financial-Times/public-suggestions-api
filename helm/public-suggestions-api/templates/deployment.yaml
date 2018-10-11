@@ -51,6 +51,10 @@ spec:
           value: "{{ .Values.env.DEFAULT_SOURCE_ORGANISATIONS }}"
         - name: DEFAULT_SOURCE_LOCATIONS
           value: "{{ .Values.env.DEFAULT_SOURCE_LOCATIONS }}"
+        - name: CONCEPT_CONCORDANCES_API_BASE_URL
+          value: "{{ .Values.env.CONCEPT_CONCORDANCES_API_BASE_URL }}"
+        - name: CONCEPT_CONCORDANCES_ENDPOINT
+          value: "{{ .Values.env.CONCEPT_CONCORDANCES_ENDPOINT }}"  
         ports:
         - containerPort: 8080
         livenessProbe:

@@ -144,7 +144,7 @@ func main() {
 		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, defaultSources, falconSuggester, authorsSuggester)
+		suggester := service.NewAggregateSuggester(concordanceService, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)

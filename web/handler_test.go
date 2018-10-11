@@ -281,7 +281,6 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 
 func TestRequestHandler_HandleSuggestionErrorInvalidLocationParamOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
-
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest?location=invalid", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
@@ -306,7 +305,6 @@ func TestRequestHandler_HandleSuggestionErrorInvalidLocationParamOnGetSuggestion
 
 func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T) {
 	expect := assert.New(t)
-
 	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
@@ -337,7 +335,6 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 //Might not happen at all if MetadataServices returns always 204 when there are no suggestions
 func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	expect := assert.New(t)
-
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")

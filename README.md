@@ -38,7 +38,7 @@ Options:
       --authors-suggestion-api-base-url    The base URL to authors suggestion api (env $AUTHORS_SUGGESTION_API_BASE_URL) (default "http://authors-suggestion-api:8080")
       --authors-suggestion-endpoint        The endpoint for authors suggestion api (env $AUTHORS_SUGGESTION_ENDPOINT) (default "/content/suggest/authors")
       --internal-concordances-api-base-url The base URL for internal concept concordances api (env $CONCEPT_CONCORDANCES_API_BASE_URL) (default "http://internal-concordances:8080")
-      --internal-concordances-endpoint     The endpoint for internal concept concordances api (CONCEPT_CONCORDANCES_ENDPOINT) (default "/internalconcordances")
+      --internal-concordances-endpoint     The endpoint for internal concept concordances api (env $CONCEPT_CONCORDANCES_ENDPOINT) (default "/internalconcordances")
 3. Test:
 
     1. Either using curl:

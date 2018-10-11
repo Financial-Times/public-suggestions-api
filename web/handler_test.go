@@ -109,7 +109,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	buffer := &ClosingBuffer{
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{}, nil)
@@ -162,7 +162,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithPersonFlagTme(t *testing
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
 
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
 
 	handler := NewRequestHandler(&service.AggregateSuggester{

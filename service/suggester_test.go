@@ -398,12 +398,174 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
+func TestAuthorsSuggester_CheckHealthUnhealthy(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("GTG").Return(503)
+	server := mockServer.startMockServer(t)
+
+	suggester := NewAuthorsSuggester(server.URL, "/__gtg", http.DefaultClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	expect.Empty(checkResult)
+	assert.Equal(t, "Health check returned a non-200 HTTP status: 503", err.Error())
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestAuthorsSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
+	expect := assert.New(t)
+
+	suggester := NewAuthorsSuggester(":/", "/__gtg", http.DefaultClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	expect.Empty(checkResult)
+}
+
+func TestAuthorsSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
+	expect := assert.New(t)
+	mockClient := new(mockHttpClient)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
+
+	suggester := NewAuthorsSuggester("http://test-url", "/__gtg", mockClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	assert.Equal(t, "Http Client err", err.Error())
+	expect.Empty(checkResult)
+	mockClient.AssertExpectations(t)
+}
+
+func TestOntotextSuggester_CheckHealth(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("GTG").Return(200)
+	server := mockServer.startMockServer(t)
+
+	suggester := NewOntotextSuggester(server.URL, "/__gtg", http.DefaultClient)
+	check := suggester.Check()
+	checkResult, err := check.Checker()
+
+	expect.Equal("ontotext-suggestion-api", check.ID)
+	expect.Equal("Suggesting locations, organisations and person from Ontotext won't work", check.BusinessImpact)
+	expect.Equal("Ontotext Suggestion API Healthcheck", check.Name)
+	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
+	expect.Equal("Ontotext Suggestion API is not available", check.TechnicalSummary)
+	expect.Equal(uint8(2), check.Severity)
+	expect.NoError(err)
+	expect.Equal("Ontotext Suggestion API is healthy", checkResult)
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestOntotextSuggester_CheckHealthUnhealthy(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("GTG").Return(503)
+	server := mockServer.startMockServer(t)
+
+	suggester := NewOntotextSuggester(server.URL, "/__gtg", http.DefaultClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	expect.Empty(checkResult)
+	assert.Equal(t, "Health check returned a non-200 HTTP status: 503", err.Error())
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestOntotextSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
+	expect := assert.New(t)
+
+	suggester := NewOntotextSuggester(":/", "/__gtg", http.DefaultClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	expect.Empty(checkResult)
+}
+
+func TestOntotextSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
+	expect := assert.New(t)
+	mockClient := new(mockHttpClient)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
+
+	suggester := NewOntotextSuggester("http://test-url", "/__gtg", mockClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	assert.Equal(t, "Http Client err", err.Error())
+	expect.Empty(checkResult)
+	mockClient.AssertExpectations(t)
+}
+
+func TestConcordanceService_CheckHealth(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("GTG").Return(200).Once()
+	server := mockServer.startMockServer(t)
+
+	suggester := NewConcordance(server.URL, "/__gtg", http.DefaultClient)
+	check := suggester.Check()
+	checkResult, err := check.Checker()
+
+	expect.Equal("internal-concordances", check.ID)
+	expect.Equal("Suggestions won't work", check.BusinessImpact)
+	expect.Equal("internal-concordances Healthcheck", check.Name)
+	expect.Equal("https://dewey.in.ft.com/view/system/internal-concordances", check.PanicGuide)
+	expect.Equal("internal-concordances is not available", check.TechnicalSummary)
+	expect.Equal(uint8(2), check.Severity)
+	expect.NoError(err)
+	expect.Equal("internal-concordances is healthy", checkResult)
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestConcordanceService_CheckHealthUnhealthy(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("GTG").Return(503)
+	server := mockServer.startMockServer(t)
+
+	suggester := NewConcordance(server.URL, "/__gtg", http.DefaultClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	expect.Empty(checkResult)
+	assert.Equal(t, "Health check returned a non-200 HTTP status: 503", err.Error())
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestConcordanceService_CheckHealthErrorOnNewRequest(t *testing.T) {
+	expect := assert.New(t)
+
+	suggester := NewConcordance(":/", "/__gtg", http.DefaultClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	expect.Empty(checkResult)
+}
+
+func TestConcordanceService_CheckHealthErrorOnRequestDo(t *testing.T) {
+	expect := assert.New(t)
+	mockClient := new(mockHttpClient)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
+
+	suggester := NewConcordance("http://test-url", "/__gtg", mockClient)
+	checkResult, err := suggester.Check().Checker()
+
+	expect.Error(err)
+	assert.Equal(t, "Http Client err", err.Error())
+	expect.Empty(checkResult)
+	mockClient.AssertExpectations(t)
+}
+
 func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
 	suggestionApi := new(mockSuggestionApi)
 	mockClient := new(mockHttpClient)
-	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
 	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		Suggestion{
@@ -446,7 +608,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	buffer := &ClosingBuffer{
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	defaultConceptsSources := buildDefaultConceptSources()
 
@@ -509,9 +671,9 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	buffer := &ClosingBuffer{
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
-	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
@@ -596,7 +758,7 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	buffer := &ClosingBuffer{
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
-	req, err := http.NewRequest("GET", "ConcordanceBaseURL/ConcordanceEndpoint", nil)
+	req, err := http.NewRequest("GET", "internalConcordancesHost/internalconcordances", nil)
 	expect.NoError(err)
 
 	queryParams := req.URL.Query()
@@ -607,13 +769,13 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", "tid_test")
-	mockClient.On("Do", req).Return(&http.Response{Body: buffer}, nil)
+	mockClient.On("Do", req).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	// create all the services
 	defaultConceptsSources := buildDefaultConceptSources()
 	falconSuggester := NewFalconSuggester("falconUrl", "falconEndpoint", falconMock)
 	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
-	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "/ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, authorsSuggester)
 
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
@@ -650,7 +812,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 
 	suggestionApi := new(mockSuggestionApi)
 	mockClient := new(mockHttpClient)
-	mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
@@ -662,7 +824,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	buffer := &ClosingBuffer{
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{Suggestions: []Suggestion{
@@ -1056,9 +1218,12 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 		buffer := &ClosingBuffer{
 			Buffer: bytes.NewBuffer(expectedBody),
 		}
-		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       buffer,
+			StatusCode: http.StatusOK,
+		}, nil)
 
-		mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "/ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+		mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
@@ -1248,9 +1413,12 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 		buffer := &ClosingBuffer{
 			Buffer: bytes.NewBuffer(expectedBody),
 		}
-		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
+		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       buffer,
+			StatusCode: http.StatusOK,
+		}, nil)
 
-		mockConcordance := &ConcordanceService{"internal-concordances", "internal-concordances", "ConcordanceBaseURL", "ConcordanceEndpoint", mockClient, "Suggestions won't work"}
+		mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
@@ -1276,6 +1444,131 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
+	expect := assert.New(t)
+	suggestionAPI := new(mockSuggestionApi)
+	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       ontologyPersonType,
+			},
+		},
+	}}
+	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType,
+			},
+		},
+	}}
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+
+	mockClient := new(mockHttpClient)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader(""))}, fmt.Errorf("error during calling internal concordances"))
+
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionAPI, suggestionAPI)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+
+	expect.Error(err)
+	expect.Equal(err.Error(), "error during calling internal concordances")
+	expect.Len(response.Suggestions, 0)
+
+	suggestionAPI.AssertExpectations(t)
+}
+
+func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
+	expect := assert.New(t)
+	suggestionAPI := new(mockSuggestionApi)
+	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       ontologyPersonType,
+			},
+		},
+	}}
+	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType,
+			},
+		},
+	}}
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil)
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil)
+
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+
+	mockClient := new(mockHttpClient)
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionAPI, suggestionAPI)
+
+	// 503
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusServiceUnavailable,
+	}, nil).Once()
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	expect.Error(err)
+	expect.Equal("non 200 status code returned: 503", err.Error())
+	expect.Len(response.Suggestions, 0)
+
+	// 400
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusBadRequest,
+	}, nil).Once()
+	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	expect.Error(err)
+	expect.Equal("non 200 status code returned: 400", err.Error())
+	expect.Len(response.Suggestions, 0)
+
+	suggestionAPI.AssertExpectations(t)
 }
 
 func TestOntotext_MissingDefaultValues(t *testing.T) {

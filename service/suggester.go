@@ -191,7 +191,7 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 		name:                 "Ontotext Suggestion API",
 		sourceName:           CesSource,
 		targetedConceptTypes: []string{ConceptTypeLocation, ConceptTypeOrganisation, ConceptTypePerson},
-		systemId:             "Ontotext-suggestion-api",
+		systemId:             "ontotext-suggestion-api",
 		failureImpact:        "Suggesting locations, organisations and person from Ontotext won't work",
 	}}
 }
@@ -344,6 +344,9 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 		return filtered, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return filtered, fmt.Errorf("non 200 status code returned: %d", resp.StatusCode)
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

@@ -282,7 +282,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 func TestRequestHandler_HandleSuggestionErrorInvalidLocationParamOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
-	req := httptest.NewRequest("POST", "/content/suggest?location=invalid", bytes.NewReader(body))
+	req := httptest.NewRequest("POST", "/content/suggest?sourceLocation=invalid", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
@@ -399,7 +399,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 
 func buildDefaultConceptSources() map[string]string {
 	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range service.ConceptTypes {
+	for _, conceptType := range service.FilteringSources {
 		defaultConceptsSource[conceptType] = service.TmeSource
 	}
 	return defaultConceptsSource

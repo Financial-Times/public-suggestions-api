@@ -161,7 +161,7 @@ func TestRequestHandler_all(t *testing.T) {
 		},
 		{
 			testName:       "OkWithTmePersonFlag",
-			url:            "http://localhost:8081/content/suggest?person=tme",
+			url:            "http://localhost:8081/content/suggest?sourcePerson=tme",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
 				expectedFalconSuggestions[0],
@@ -172,7 +172,7 @@ func TestRequestHandler_all(t *testing.T) {
 		},
 		{
 			testName:       "OkWithTmePersonAndLocationFlag",
-			url:            "http://localhost:8081/content/suggest?person=tme&location=tme",
+			url:            "http://localhost:8081/content/suggest?sourcePerson=tme&sourceLocation=tme",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
 				expectedFalconSuggestions[0],
@@ -183,7 +183,7 @@ func TestRequestHandler_all(t *testing.T) {
 		},
 		{
 			testName:       "OkWithAllTmeFlags",
-			url:            "http://localhost:8081/content/suggest?person=tme&location=tme&organisation=tme",
+			url:            "http://localhost:8081/content/suggest?sourcePerson=tme&sourceLocation=tme&sourceOrganisation=tme",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
 				expectedFalconSuggestions[0],
@@ -194,7 +194,7 @@ func TestRequestHandler_all(t *testing.T) {
 		},
 		{
 			testName:       "OkWithCesPersonFlag",
-			url:            "http://localhost:8081/content/suggest?person=ces",
+			url:            "http://localhost:8081/content/suggest?sourcePerson=ces",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
 				expectedOntotextSuggestions[1],
@@ -206,7 +206,7 @@ func TestRequestHandler_all(t *testing.T) {
 		},
 		{
 			testName:       "OkWithCesPersonAndLocationFlag",
-			url:            "http://localhost:8081/content/suggest?person=ces&location=ces",
+			url:            "http://localhost:8081/content/suggest?sourcePerson=ces&sourceLocation=ces",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
 				expectedOntotextSuggestions[1],
@@ -218,7 +218,7 @@ func TestRequestHandler_all(t *testing.T) {
 		},
 		{
 			testName:       "OkWithAllCesFlags",
-			url:            "http://localhost:8081/content/suggest?person=ces&location=ces&organisation=ces",
+			url:            "http://localhost:8081/content/suggest?sourcePerson=ces&sourceLocation=ces&sourceOrganisation=ces",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
 				expectedOntotextSuggestions[1],
@@ -413,7 +413,7 @@ func TestRequestHandler_all(t *testing.T) {
 
 func buildDefaultConceptSources() map[string]string {
 	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range service.ConceptTypes {
+	for _, conceptType := range service.FilteringSources {
 		defaultConceptsSource[conceptType] = service.TmeSource
 	}
 	return defaultConceptsSource

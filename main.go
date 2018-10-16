@@ -135,9 +135,9 @@ func main() {
 		}
 
 		defaultSources := map[string]string{
-			service.ConceptTypePerson:       *defaultSourcePerson,
-			service.ConceptTypeLocation:     *defaultSourceLocation,
-			service.ConceptTypeOrganisation: *defaultSourceOrganisation,
+			service.FilteringSourcePerson:       *defaultSourcePerson,
+			service.FilteringSourceLocation:     *defaultSourceLocation,
+			service.FilteringSourceOrganisation: *defaultSourceOrganisation,
 		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)

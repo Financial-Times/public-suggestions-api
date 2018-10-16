@@ -37,20 +37,20 @@ var (
 
 	PseudoConceptTypeAuthor = "author"
 
-	ConceptTypePerson       = "person"
-	ConceptTypeLocation     = "location"
-	ConceptTypeOrganisation = "organisation"
-	ConceptTypes            = []string{ConceptTypePerson, ConceptTypeOrganisation, ConceptTypeLocation}
+	FilteringSourcePerson       = "sourcePerson"
+	FilteringSourceLocation     = "sourceLocation"
+	FilteringSourceOrganisation = "sourceOrganisation"
+	FilteringSources            = []string{FilteringSourcePerson, FilteringSourceOrganisation, FilteringSourceLocation}
 
 	sourcesFilters = map[string]func(Suggestion) bool{
-		ConceptTypePerson: func(value Suggestion) bool {
+		FilteringSourcePerson: func(value Suggestion) bool {
 			return value.Type == ontologyPersonType
 		},
-		ConceptTypeLocation: func(value Suggestion) bool {
+		FilteringSourceLocation: func(value Suggestion) bool {
 			return value.Type == ontologyLocationType
 
 		},
-		ConceptTypeOrganisation: func(value Suggestion) bool {
+		FilteringSourceOrganisation: func(value Suggestion) bool {
 			return value.Type == ontologyOrganisationType ||
 				value.Type == ontologyPublicCompanyType ||
 				value.Type == ontologyPrivateCompanyType ||
@@ -190,7 +190,7 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 		client:               client,
 		name:                 "Ontotext Suggestion API",
 		sourceName:           CesSource,
-		targetedConceptTypes: []string{ConceptTypeLocation, ConceptTypeOrganisation, ConceptTypePerson},
+		targetedConceptTypes: []string{FilteringSourceLocation, FilteringSourceOrganisation, FilteringSourcePerson},
 		systemId:             "ontotext-suggestion-api",
 		failureImpact:        "Suggesting locations, organisations and person from Ontotext won't work",
 	}}
@@ -373,7 +373,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s SuggestionsR
 }
 
 func filterOutConcepts(resp SuggestionsResponse, conceptTypesSources map[string]string, targetSource string) ([]Suggestion, error) {
-	for _, conceptType := range ConceptTypes {
+	for _, conceptType := range FilteringSources {
 		conceptTypeSource, ok := conceptTypesSources[conceptType]
 		if !ok {
 			return []Suggestion{}, fmt.Errorf("No source defined for %s", conceptType)

@@ -1028,9 +1028,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				},
 			},
 			flags: map[string]string{
-				ConceptTypePerson:       TmeSource,
-				ConceptTypeLocation:     TmeSource,
-				ConceptTypeOrganisation: TmeSource,
+				FilteringSourcePerson:       TmeSource,
+				FilteringSourceLocation:     TmeSource,
+				FilteringSourceOrganisation: TmeSource,
 			},
 		},
 		{
@@ -1068,9 +1068,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				},
 			},
 			flags: map[string]string{
-				ConceptTypePerson:       CesSource,
-				ConceptTypeLocation:     CesSource,
-				ConceptTypeOrganisation: CesSource,
+				FilteringSourcePerson:       CesSource,
+				FilteringSourceLocation:     CesSource,
+				FilteringSourceOrganisation: CesSource,
 			},
 		},
 		{
@@ -1108,9 +1108,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				},
 			},
 			flags: map[string]string{
-				ConceptTypePerson:       CesSource,
-				ConceptTypeLocation:     TmeSource,
-				ConceptTypeOrganisation: TmeSource,
+				FilteringSourcePerson:       CesSource,
+				FilteringSourceLocation:     TmeSource,
+				FilteringSourceOrganisation: TmeSource,
 			},
 		},
 		{
@@ -1148,9 +1148,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				},
 			},
 			flags: map[string]string{
-				ConceptTypePerson:       TmeSource,
-				ConceptTypeLocation:     CesSource,
-				ConceptTypeOrganisation: TmeSource,
+				FilteringSourcePerson:       TmeSource,
+				FilteringSourceLocation:     CesSource,
+				FilteringSourceOrganisation: TmeSource,
 			},
 		},
 		{
@@ -1188,9 +1188,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 				},
 			},
 			flags: map[string]string{
-				ConceptTypePerson:       TmeSource,
-				ConceptTypeLocation:     TmeSource,
-				ConceptTypeOrganisation: CesSource,
+				FilteringSourcePerson:       TmeSource,
+				FilteringSourceLocation:     TmeSource,
+				FilteringSourceOrganisation: CesSource,
 			},
 		},
 	}
@@ -1359,9 +1359,9 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 		{
 			testName: "fromCesOrganisations",
 			flags: map[string]string{
-				ConceptTypeLocation:     TmeSource,
-				ConceptTypePerson:       TmeSource,
-				ConceptTypeOrganisation: CesSource,
+				FilteringSourceLocation:     TmeSource,
+				FilteringSourcePerson:       TmeSource,
+				FilteringSourceOrganisation: CesSource,
 			},
 			expectedUUIDs: []string{
 				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
@@ -1582,12 +1582,12 @@ func TestOntotext_MissingDefaultValues(t *testing.T) {
 
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
 	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
-		ConceptTypeLocation:     TmeSource,
-		ConceptTypeOrganisation: TmeSource,
+		FilteringSourceLocation:     TmeSource,
+		FilteringSourceOrganisation: TmeSource,
 	}})
 
 	expect.Error(err)
-	expect.Equal("No source defined for person", err.Error())
+	expect.Equal("No source defined for sourcePerson", err.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)
@@ -1604,12 +1604,12 @@ func TestFalcon_MissingDefaultValues(t *testing.T) {
 
 	suggester := NewFalconSuggester("falconURL", "falconEndpoint", falconHTTPMock)
 	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
-		ConceptTypeLocation:     CesSource,
-		ConceptTypeOrganisation: CesSource,
+		FilteringSourceLocation:     CesSource,
+		FilteringSourceOrganisation: CesSource,
 	}})
 
 	expect.Error(err)
-	expect.Equal("No source defined for person", err.Error())
+	expect.Equal("No source defined for sourcePerson", err.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)
@@ -1623,8 +1623,8 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
 	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
-		ConceptTypeLocation:     CesSource,
-		ConceptTypeOrganisation: TmeSource,
+		FilteringSourceLocation:     CesSource,
+		FilteringSourceOrganisation: TmeSource,
 	}})
 
 	expect.Error(err)
@@ -1637,26 +1637,26 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 func TestHasFlag(t *testing.T) {
 	expect := assert.New(t)
 
-	firstSuggesterTargetedTypes := []string{ConceptTypePerson, ConceptTypeOrganisation}
-	secondSuggesterTargetedTypes := []string{ConceptTypeLocation}
+	firstSuggesterTargetedTypes := []string{FilteringSourcePerson, FilteringSourceOrganisation}
+	secondSuggesterTargetedTypes := []string{FilteringSourceLocation}
 	sourceFlags := SourceFlags{
 		Flags: map[string]string{
-			ConceptTypeLocation:     CesSource,
-			ConceptTypeOrganisation: CesSource,
-			ConceptTypePerson:       CesSource,
+			FilteringSourceLocation:     CesSource,
+			FilteringSourceOrganisation: CesSource,
+			FilteringSourcePerson:       CesSource,
 		},
 	}
 	expect.True(sourceFlags.hasFlag(CesSource, firstSuggesterTargetedTypes))
 	expect.True(sourceFlags.hasFlag(CesSource, secondSuggesterTargetedTypes))
 
-	sourceFlags.Flags[ConceptTypeLocation] = TmeSource
+	sourceFlags.Flags[FilteringSourceLocation] = TmeSource
 	expect.True(sourceFlags.hasFlag(CesSource, firstSuggesterTargetedTypes))
 	expect.False(sourceFlags.hasFlag(CesSource, secondSuggesterTargetedTypes))
 }
 
 func buildDefaultConceptSources() map[string]string {
 	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range ConceptTypes {
+	for _, conceptType := range FilteringSources {
 		defaultConceptsSource[conceptType] = TmeSource
 	}
 	return defaultConceptsSource

@@ -1619,7 +1619,7 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 	expect := assert.New(t)
 
 	ontotextHTTPMock := new(mockHttpClient)
-	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, fmt.Errorf("Error from ontotext-suggestions-api"))
+	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, fmt.Errorf("Error from ontotext-suggestion-api"))
 
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
 	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
@@ -1628,7 +1628,7 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 	}})
 
 	expect.Error(err)
-	expect.Equal("Error from ontotext-suggestions-api", err.Error())
+	expect.Equal("Error from ontotext-suggestion-api", err.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)

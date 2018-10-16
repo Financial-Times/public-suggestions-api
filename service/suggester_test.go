@@ -1587,7 +1587,7 @@ func TestOntotext_MissingDefaultValues(t *testing.T) {
 	}})
 
 	expect.Error(err)
-	expect.Equal("No source defined for sourcePerson", err.Error())
+	expect.Equal("No source defined for personSource", err.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)
@@ -1609,7 +1609,7 @@ func TestFalcon_MissingDefaultValues(t *testing.T) {
 	}})
 
 	expect.Error(err)
-	expect.Equal("No source defined for sourcePerson", err.Error())
+	expect.Equal("No source defined for personSource", err.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)

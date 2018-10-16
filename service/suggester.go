@@ -37,9 +37,9 @@ var (
 
 	PseudoConceptTypeAuthor = "author"
 
-	FilteringSourcePerson       = "sourcePerson"
-	FilteringSourceLocation     = "sourceLocation"
-	FilteringSourceOrganisation = "sourceOrganisation"
+	FilteringSourcePerson       = "personSource"
+	FilteringSourceLocation     = "locationSource"
+	FilteringSourceOrganisation = "organisationSource"
 	FilteringSources            = []string{FilteringSourcePerson, FilteringSourceOrganisation, FilteringSourceLocation}
 
 	sourcesFilters = map[string]func(Suggestion) bool{

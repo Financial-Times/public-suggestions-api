@@ -282,7 +282,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 func TestRequestHandler_HandleSuggestionErrorInvalidLocationParamOnGetSuggestions(t *testing.T) {
 	expect := assert.New(t)
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
-	req := httptest.NewRequest("POST", "/content/suggest?sourceLocation=invalid", bytes.NewReader(body))
+	req := httptest.NewRequest("POST", "/content/suggest?locationSource=invalid", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 

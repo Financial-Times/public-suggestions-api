@@ -64,6 +64,11 @@ func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags 
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
+func (s *mockSuggesterService) FilterSuggestions(suggestions []service.Suggestion, flags service.SourceFlags) []service.Suggestion {
+	args := s.Called(suggestions, flags)
+	return args.Get(0).([]service.Suggestion)
+}
+
 func (s *mockSuggesterService) GetName() string {
 	return "Mock suggester service"
 }
@@ -112,6 +117,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
+	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{}, nil)
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:   mockConcordance,
@@ -164,6 +170,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithPersonFlagTme(t *testing
 
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
+	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:   mockConcordance,
@@ -399,7 +406,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 
 func buildDefaultConceptSources() map[string]string {
 	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range service.FilteringSources {
+	for _, conceptType := range service.TypeSourceParams {
 		defaultConceptsSource[conceptType] = service.TmeSource
 	}
 	return defaultConceptsSource

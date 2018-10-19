@@ -99,21 +99,27 @@ func main() {
 
 	defaultSourcePerson := app.String(cli.StringOpt{
 		Name:   "default-source-person",
-		Value:  "tme",
+		Value:  service.TmeSource,
 		Desc:   "The default source for person suggestions",
 		EnvVar: "DEFAULT_SOURCE_PERSON",
 	})
 	defaultSourceOrganisation := app.String(cli.StringOpt{
 		Name:   "default-source-organisation",
-		Value:  "tme",
+		Value:  service.TmeSource,
 		Desc:   "The default source for organisations suggestions",
 		EnvVar: "DEFAULT_SOURCE_ORGANISATION",
 	})
 	defaultSourceLocation := app.String(cli.StringOpt{
 		Name:   "default-source-location",
-		Value:  "tme",
+		Value:  service.TmeSource,
 		Desc:   "The default source for locations suggestions",
 		EnvVar: "DEFAULT_SOURCE_LOCATION",
+	})
+	defaultSourceTopic := app.String(cli.StringOpt{
+		Name:   "default-source-topic",
+		Value:  service.TmeSource,
+		Desc:   "The default source for topics suggestions",
+		EnvVar: "DEFAULT_SOURCE_TOPIC",
 	})
 
 	log.InitDefaultLogger(*appName)
@@ -135,9 +141,11 @@ func main() {
 		}
 
 		defaultSources := map[string]string{
-			service.FilteringSourcePerson:       *defaultSourcePerson,
-			service.FilteringSourceLocation:     *defaultSourceLocation,
-			service.FilteringSourceOrganisation: *defaultSourceOrganisation,
+			service.PersonSourceParam:       *defaultSourcePerson,
+			service.LocationSourceParam:     *defaultSourceLocation,
+			service.OrganisationSourceParam: *defaultSourceOrganisation,
+			service.TopicSourceParam:        *defaultSourceTopic,
+			service.PseudoConceptTypeAuthor: service.AuthorsSource,
 		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)

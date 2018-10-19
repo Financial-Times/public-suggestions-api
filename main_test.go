@@ -413,8 +413,9 @@ func TestRequestHandler_all(t *testing.T) {
 
 func buildDefaultConceptSources() map[string]string {
 	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range service.FilteringSources {
+	for _, conceptType := range service.TypeSourceParams {
 		defaultConceptsSource[conceptType] = service.TmeSource
 	}
+	defaultConceptsSource[service.PseudoConceptTypeAuthor] = service.AuthorsSource
 	return defaultConceptsSource
 }

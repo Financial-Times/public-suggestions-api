@@ -92,14 +92,18 @@ func writeResponse(writer http.ResponseWriter, status int, response []byte) {
 func prepareTypesSource(req *http.Request, defaultValues map[string]string) (map[string]string, error) {
 	result := make(map[string]string)
 	for conceptType, defaultValue := range defaultValues {
+		result[conceptType] = defaultValue
+
+		if conceptType == service.PseudoConceptTypeAuthor {
+			//no override for authors
+			continue
+		}
 		val, found, err := util.GetSingleValueQueryParameter(req, conceptType, service.TmeSource, service.CesSource)
 		if err != nil {
 			return result, err
 		}
 		if found {
 			result[conceptType] = val
-		} else {
-			result[conceptType] = defaultValue
 		}
 	}
 

@@ -173,7 +173,7 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 		client:               client,
 		name:                 "Ontotext Suggestion API",
 		sourceName:           CesSource,
-		targetedConceptTypes: []string{LocationSourceParam, OrganisationSourceParam, PersonSourceParam},
+		targetedConceptTypes: []string{LocationSourceParam, OrganisationSourceParam, PersonSourceParam, TopicSourceParam},
 		systemId:             "ontotext-suggestion-api",
 		failureImpact:        "Suggesting locations, organisations and people from Ontotext won't work",
 	}}

@@ -10,16 +10,18 @@ import (
 const idsParamName = "ids"
 
 type AggregateSuggester struct {
-	DefaultSource map[string]string
-	Concordance   *ConcordanceService
-	Suggesters    []Suggester
+	DefaultSource  map[string]string
+	Concordance    *ConcordanceService
+	BroaderExclude *BroaderExcludeService
+	Suggesters     []Suggester
 }
 
-func NewAggregateSuggester(concordance *ConcordanceService, defaultTypesSources map[string]string, suggesters ...Suggester) *AggregateSuggester {
+func NewAggregateSuggester(concordance *ConcordanceService, broaderExcludingService *BroaderExcludeService, defaultTypesSources map[string]string, suggesters ...Suggester) *AggregateSuggester {
 	return &AggregateSuggester{
-		Concordance:   concordance,
-		DefaultSource: defaultTypesSources,
-		Suggesters:    suggesters,
+		Concordance:    concordance,
+		BroaderExclude: broaderExcludingService,
+		DefaultSource:  defaultTypesSources,
+		Suggesters:     suggesters,
 	}
 }
 
@@ -65,6 +67,13 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		if len(responseMap[key]) > 0 {
 			responseMap[key] = suggesterDelegate.FilterSuggestions(responseMap[key], flags)
 		}
+	}
+
+	results, err := suggester.BroaderExclude.excludeBroaderConcepts(responseMap, tid, flags.Debug)
+	if err != nil {
+		log.WithError(err).Warn("Couldn't exclude broader concepts. Response could contains the broader concepts as well")
+	} else {
+		responseMap = results
 	}
 
 	// preserve results order

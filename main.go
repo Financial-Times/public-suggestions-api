@@ -97,6 +97,19 @@ func main() {
 		EnvVar: "CONCEPT_CONCORDANCES_ENDPOINT",
 	})
 
+	publicThingsAPIBaseURL := app.String(cli.StringOpt{
+		Name:   "public-things-api-base-url",
+		Value:  "http://public-things-api:8080",
+		Desc:   "The base URL for public things api",
+		EnvVar: "PUBLIC_THINGS_API_BASE_URL",
+	})
+	publicThingsEndpoint := app.String(cli.StringOpt{
+		Name:   "public-things-endpoint",
+		Value:  "/things",
+		Desc:   "The endpoint for public things api",
+		EnvVar: "PUBLIC_THINGS_ENDPOINT",
+	})
+
 	defaultSourcePerson := app.String(cli.StringOpt{
 		Name:   "default-source-person",
 		Value:  service.TmeSource,
@@ -152,7 +165,8 @@ func main() {
 		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
+		broaderService := service.NewBroaderExcludeService(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
+		suggester := service.NewAggregateSuggester(concordanceService, broaderService, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)

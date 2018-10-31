@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"net/http"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
@@ -82,6 +83,7 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	}
 
 	mockClient := new(mockHttpClient)
+	mockClientError := new(mockHttpClient)
 	expectedBody, err := json.Marshal(&mockInternalConcResp)
 	require.NoError(t, err)
 	buffer := &ClosingBuffer{
@@ -100,13 +102,15 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", "tid_test")
 	mockClient.On("Do", req).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
+	mockClientError.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusInternalServerError}, nil)
 
 	// create all the services
 	defaultConceptsSources := buildDefaultConceptSources()
 	falconSuggester := NewFalconSuggester("falconUrl", "falconEndpoint", falconMock)
 	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, authorsSuggester)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientError)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, falconSuggester, authorsSuggester)
 
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
@@ -445,11 +449,18 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 			StatusCode: http.StatusOK,
 		}, nil)
 
+		mockClientPublicThings := new(mockHttpClient)
+		mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(strings.NewReader("")),
+			StatusCode: http.StatusOK,
+		}, nil)
+
 		mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
-		aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, ontotextSuggester)
+		broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, falconSuggester, ontotextSuggester)
 
 		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
 		expect.NoError(err)
@@ -642,11 +653,18 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 			StatusCode: http.StatusOK,
 		}, nil)
 
+		mockClientPublicThings := new(mockHttpClient)
+		mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body:       ioutil.NopCloser(strings.NewReader("")),
+			StatusCode: http.StatusOK,
+		}, nil)
+
 		mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
-		aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, falconSuggester, ontotextSuggester)
+		broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, falconSuggester, ontotextSuggester)
 
 		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
 		expect.NoError(err)
@@ -715,8 +733,15 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader(""))}, fmt.Errorf("error during calling internal concordances"))
 
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionAPI, suggestionAPI)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, suggestionAPI, suggestionAPI)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Error(err)
@@ -768,9 +793,16 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
 	}
 
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
 	mockClient := new(mockHttpClient)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionAPI, suggestionAPI)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, suggestionAPI, suggestionAPI)
 
 	// 503
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -848,9 +880,16 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
 	defaultConceptsSources := buildDefaultConceptSources()
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Len(response.Suggestions, 2)
@@ -913,8 +952,15 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.NoError(err)
@@ -932,8 +978,15 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	mockConcordance := new(ConcordanceService)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
 	defaultConceptsSources := buildDefaultConceptSources()
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.NoError(err)
@@ -980,8 +1033,15 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(suggestionsResponse, nil).Once()
 	suggestionApi.On("FilterSuggestions", suggestionsResponse.Suggestions, mock.Anything).Return(suggestionsResponse.Suggestions).Once()
 
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
 	defaultConceptsSources := buildDefaultConceptSources()
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, defaultConceptsSources, suggestionApi, suggestionApi)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.NoError(err)

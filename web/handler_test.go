@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,6 +102,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 
 	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
+	mockPublicThings := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
@@ -115,14 +118,19 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
+	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
+	broaderService := &service.BroaderExcludeService{
+		Client: mockPublicThings,
+	}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{}, nil)
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:   mockConcordance,
-		DefaultSource: defaultConceptsSources,
-		Suggesters:    []service.Suggester{mockSuggester},
+		Concordance:    mockConcordance,
+		DefaultSource:  defaultConceptsSources,
+		BroaderExclude: broaderService,
+		Suggesters:     []service.Suggester{mockSuggester},
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -153,6 +161,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithPersonFlagTme(t *testing
 
 	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
+	mockPublicThings := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
@@ -171,11 +180,16 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithPersonFlagTme(t *testing
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
+	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
+	broaderService := &service.BroaderExcludeService{
+		Client: mockPublicThings,
+	}
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:   mockConcordance,
-		DefaultSource: defaultConceptsSources,
-		Suggesters:    []service.Suggester{mockSuggester},
+		Concordance:    mockConcordance,
+		DefaultSource:  defaultConceptsSources,
+		BroaderExclude: broaderService,
+		Suggesters:     []service.Suggester{mockSuggester},
 	})
 
 	handler.HandleSuggestion(w, req)

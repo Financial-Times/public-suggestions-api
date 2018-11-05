@@ -71,7 +71,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 
 	results, err := suggester.BroaderExclude.excludeBroaderConcepts(responseMap, tid, flags.Debug)
 	if err != nil {
-		log.WithError(err).Warn("Couldn't exclude broader concepts. Response could contains the broader concepts as well")
+		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
 	} else {
 		responseMap = results
 	}

@@ -185,18 +185,24 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	}
 	wg.Wait()
 
-	results, err := suggester.BroaderExclude.excludeBroaderConcepts(responseMap, tid, flags.Debug)
-	if err != nil {
-		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
-	} else {
-		responseMap = results
-	}
-
 	// preserve results order
 	for i := 0; i < len(suggester.Suggesters); i++ {
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
 	}
-	return suggester.filterByInternalConcordances(aggregateResp, tid, flags.Debug)
+
+	withoutDeprecated, err := suggester.filterByInternalConcordances(aggregateResp, tid, flags.Debug)
+	if err != nil {
+		return withoutDeprecated, err
+	}
+
+	results, err := suggester.BroaderExclude.excludeBroaderConceptsFromResponse(withoutDeprecated, tid, flags.Debug)
+	if err != nil {
+		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
+	} else {
+		withoutDeprecated = results
+	}
+
+	return withoutDeprecated, nil
 }
 
 func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {

@@ -78,6 +78,50 @@ func (b *BroaderExcludeService) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", b.name), nil
 }
 
+func (b *BroaderExcludeService) excludeBroaderConceptsFromResponse(suggestions SuggestionsResponse, tid string, debugFlag string) (SuggestionsResponse, error) {
+	var ids []string
+	for _, suggestion := range suggestions.Suggestions {
+		ids = append(ids, fp.Base(suggestion.ID))
+	}
+
+	if len(ids) == 0 {
+		return suggestions, nil
+	}
+
+	broader, err := b.getBroaderConcepts(ids, tid)
+	if err != nil {
+		return suggestions, err
+	}
+
+	broaderConceptsChecker := make(map[string]bool)
+	for _, thing := range broader.Things {
+		for _, broaderConcept := range thing.BroaderConcepts {
+			broaderConceptsChecker[fp.Base(broaderConcept.ID)] = true
+		}
+	}
+	if len(broaderConceptsChecker) == 0 {
+		return suggestions, nil
+	}
+
+	results := SuggestionsResponse{
+		Suggestions: make([]Suggestion, 0),
+	}
+	for _, suggestion := range suggestions.Suggestions {
+		if broaderConceptsChecker[fp.Base(suggestion.ID)] {
+			if debugFlag != "" {
+				logger.WithField("ExcludedID", suggestion.ID).
+					WithField("ExcludedPrefLabel", suggestion.PrefLabel).
+					Info("Broader Concept excluded")
+			}
+			continue
+		}
+		results.Suggestions = append(results.Suggestions, suggestion)
+	}
+
+	return results, nil
+}
+
+// @TODO USE THIS ON MERGE
 func (b *BroaderExcludeService) excludeBroaderConcepts(suggestions map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {
 	var ids []string
 	for _, sourceSuggestions := range suggestions {

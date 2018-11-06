@@ -445,7 +445,6 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	}}, nil)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
 
-	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
 	broaderService := &service.BroaderExcludeService{
 		Client: mockPublicThings,
 	}

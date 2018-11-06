@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -375,7 +376,14 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
@@ -392,7 +400,13 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	mockConcordance := new(ConcordanceService)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 0)
@@ -434,7 +448,13 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	},
 	}, nil).Once()
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, suggestionApi, suggestionApi)
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 1)

@@ -42,8 +42,9 @@ type Suggester interface {
 }
 
 type AggregateSuggester struct {
-	Concordance *ConcordanceService
-	Suggesters  []Suggester
+	Concordance    *ConcordanceService
+	Suggesters     []Suggester
+	BroaderExclude *BroaderExcludeService
 }
 
 type SuggestionApi struct {
@@ -143,8 +144,12 @@ func NewConcordance(internalConcordancesApiBaseURL, internalConcordancesEndpoint
 	}
 }
 
-func NewAggregateSuggester(concordance *ConcordanceService, suggesters ...Suggester) *AggregateSuggester {
-	return &AggregateSuggester{concordance, suggesters}
+func NewAggregateSuggester(concordance *ConcordanceService, broaderExcludingService *BroaderExcludeService, suggesters ...Suggester) *AggregateSuggester {
+	return &AggregateSuggester{
+		Suggesters:     suggesters,
+		Concordance:    concordance,
+		BroaderExclude: broaderExcludingService,
+	}
 }
 
 func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
@@ -179,6 +184,14 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		}(key, suggesterDelegate)
 	}
 	wg.Wait()
+
+	results, err := suggester.BroaderExclude.excludeBroaderConcepts(responseMap, tid, flags.Debug)
+	if err != nil {
+		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
+	} else {
+		responseMap = results
+	}
+
 	// preserve results order
 	for i := 0; i < len(suggester.Suggesters); i++ {
 		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)

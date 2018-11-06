@@ -17,3 +17,5 @@ resources:
 env:
   FALCON_SUGGESTION_API_BASE_URL: "" # This should be defined in the specific app-configs folder
   FALCON_SUGGESTION_ENDPOINT: "" # This should be defined in the specific app-configs folder
+  PUBLIC_THINGS_API_BASE_URL: "" # This should be defined in the specific app-configs folder
+  PUBLIC_THINGS_ENDPOINT: "" # This should be defined in the specific app-configs folder

@@ -8,3 +8,5 @@ env:
   AUTHORS_SUGGESTION_ENDPOINT: "/content/suggest/authors"
   CONCEPT_CONCORDANCES_API_BASE_URL: "http://internal-concordances:8080"
   CONCEPT_CONCORDANCES_ENDPOINT: "/internalconcordances"
+  PUBLIC_THINGS_API_BASE_URL: "http://public-things-api:8080"
+  PUBLIC_THINGS_ENDPOINT: "/things"

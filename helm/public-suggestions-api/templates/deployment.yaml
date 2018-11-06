@@ -44,7 +44,11 @@ spec:
         - name: CONCEPT_CONCORDANCES_API_BASE_URL
           value: "{{ .Values.env.CONCEPT_CONCORDANCES_API_BASE_URL }}"
         - name: CONCEPT_CONCORDANCES_ENDPOINT
-          value: "{{ .Values.env.CONCEPT_CONCORDANCES_ENDPOINT }}"  
+          value: "{{ .Values.env.CONCEPT_CONCORDANCES_ENDPOINT }}"
+        - name: PUBLIC_THINGS_API_BASE_URL
+          value: "{{ .Values.env.PUBLIC_THINGS_API_BASE_URL }}"
+        - name: PUBLIC_THINGS_ENDPOINT
+          value: "{{ .Values.env.PUBLIC_THINGS_ENDPOINT }}"
         ports:
         - containerPort: 8080
         livenessProbe:

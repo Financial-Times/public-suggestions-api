@@ -109,7 +109,8 @@ func (b *BroaderExcludeService) excludeBroaderConceptsFromResponse(suggestions S
 	for _, suggestion := range suggestions.Suggestions {
 		if broaderConceptsChecker[fp.Base(suggestion.ID)] {
 			if debugFlag != "" {
-				logger.WithField("ExcludedID", suggestion.ID).
+				logger.WithTransactionID(tid).
+					WithField("ExcludedID", suggestion.ID).
 					WithField("ExcludedPrefLabel", suggestion.PrefLabel).
 					Info("Broader Concept excluded")
 			}
@@ -155,7 +156,8 @@ func (b *BroaderExcludeService) excludeBroaderConcepts(suggestions map[int][]Sug
 		for _, suggestion := range sourceSuggestions {
 			if broaderConceptsChecker[fp.Base(suggestion.ID)] {
 				if debugFlag != "" {
-					logger.WithField("ExcludedID", suggestion.ID).
+					logger.WithTransactionID(tid).
+						WithField("ExcludedID", suggestion.ID).
 						WithField("ExcludedPrefLabel", suggestion.PrefLabel).
 						Info("Broader Concept excluded")
 				}

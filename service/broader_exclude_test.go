@@ -74,14 +74,14 @@ func TestBroaderExcludeService_CheckHealthErrorOnRequestDo(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
+func TestBroaderService_excludeBroaderConceptsFromResponse(t *testing.T) {
 	ast := assert.New(t)
 
 	testCases := []struct {
 		testName    string
-		suggestions map[int][]Suggestion
+		suggestions []Suggestion
 
-		expectedSuggestions   map[int][]Suggestion
+		expectedSuggestions   []Suggestion
 		expectedErrorContains string
 
 		publicThingsResponse    broaderResponse
@@ -102,31 +102,27 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 					},
 				},
 			},
-			suggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			suggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
-			expectedSuggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			expectedSuggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
@@ -144,41 +140,37 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 					},
 				},
 			},
-			suggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			suggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
-			expectedSuggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			expectedSuggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
@@ -188,8 +180,8 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 			publicThingsResponse: broaderResponse{
 				Things: map[string]Thing{},
 			},
-			suggestions:             map[int][]Suggestion{},
-			expectedSuggestions:     map[int][]Suggestion{},
+			suggestions:             []Suggestion{},
+			expectedSuggestions:     []Suggestion{},
 			publicThingsCallSkipped: true,
 		},
 		{
@@ -199,51 +191,47 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 			},
 			publicThingsStatusCode: http.StatusBadGateway,
 			expectedErrorContains:  "non 200 status code returned: 502",
-			suggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			suggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
-			expectedSuggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			expectedSuggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
@@ -285,115 +273,107 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 					},
 				},
 			},
-			suggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/a13db394-dd01-11e8-a00d-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/a13db394-dd01-11e8-a00d-6c96cfdf3997",
-							PrefLabel:  "Bank of England",
-							Type:       "http://www.ft.com/ontology/organisation/Organisation",
-							IsFTAuthor: false,
-						},
-					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/a1a2f869-dd01-11e8-abd7-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/a1a2f869-dd01-11e8-abd7-6c96cfdf3997",
-							PrefLabel:  "Global Banking",
-							Type:       "http://www.ft.com/ontology/organisation/Organisation",
-							IsFTAuthor: false,
-						},
-					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/a1f96d3d-dd01-11e8-b32e-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/a1f96d3d-dd01-11e8-b32e-6c96cfdf3997",
-							PrefLabel:  "Economy",
-							Type:       "http://www.ft.com/ontology/organisation/Organisation",
-							IsFTAuthor: false,
-						},
+			suggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/a13db394-dd01-11e8-a00d-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/a13db394-dd01-11e8-a00d-6c96cfdf3997",
+						PrefLabel:  "Bank of England",
+						Type:       "http://www.ft.com/ontology/organisation/Organisation",
+						IsFTAuthor: false,
 					},
 				},
-				2: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
-							PrefLabel:  "Google Inc.",
-							Type:       "http://www.ft.com/ontology/Topic",
-							IsFTAuthor: false,
-						},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/a1a2f869-dd01-11e8-abd7-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/a1a2f869-dd01-11e8-abd7-6c96cfdf3997",
+						PrefLabel:  "Global Banking",
+						Type:       "http://www.ft.com/ontology/organisation/Organisation",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/c517ae15-dd01-11e8-aaba-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/c517ae15-dd01-11e8-aaba-6c96cfdf3997",
-							PrefLabel:  "Private company",
-							Type:       "http://www.ft.com/ontology/Topic",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/a1f96d3d-dd01-11e8-b32e-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/a1f96d3d-dd01-11e8-b32e-6c96cfdf3997",
+						PrefLabel:  "Economy",
+						Type:       "http://www.ft.com/ontology/organisation/Organisation",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/c9e114c1-dd01-11e8-8d2b-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/c9e114c1-dd01-11e8-8d2b-6c96cfdf3997",
-							PrefLabel:  "Company",
-							Type:       "http://www.ft.com/ontology/Topic",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
+						PrefLabel:  "Google Inc.",
+						Type:       "http://www.ft.com/ontology/Topic",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
-							PrefLabel:  "Apple",
-							Type:       "http://www.ft.com/ontology/Topic",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/c517ae15-dd01-11e8-aaba-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/c517ae15-dd01-11e8-aaba-6c96cfdf3997",
+						PrefLabel:  "Private company",
+						Type:       "http://www.ft.com/ontology/Topic",
+						IsFTAuthor: false,
+					},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/c9e114c1-dd01-11e8-8d2b-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/c9e114c1-dd01-11e8-8d2b-6c96cfdf3997",
+						PrefLabel:  "Company",
+						Type:       "http://www.ft.com/ontology/Topic",
+						IsFTAuthor: false,
+					},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
+						PrefLabel:  "Apple",
+						Type:       "http://www.ft.com/ontology/Topic",
+						IsFTAuthor: false,
 					},
 				},
 			},
-			expectedSuggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/a13db394-dd01-11e8-a00d-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/a13db394-dd01-11e8-a00d-6c96cfdf3997",
-							PrefLabel:  "Bank of England",
-							Type:       "http://www.ft.com/ontology/organisation/Organisation",
-							IsFTAuthor: false,
-						},
+			expectedSuggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/a13db394-dd01-11e8-a00d-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/a13db394-dd01-11e8-a00d-6c96cfdf3997",
+						PrefLabel:  "Bank of England",
+						Type:       "http://www.ft.com/ontology/organisation/Organisation",
+						IsFTAuthor: false,
 					},
 				},
-				2: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
-							PrefLabel:  "Google Inc.",
-							Type:       "http://www.ft.com/ontology/Topic",
-							IsFTAuthor: false,
-						},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/a2a0e506-dd01-11e8-b8b5-6c96cfdf3997",
+						PrefLabel:  "Google Inc.",
+						Type:       "http://www.ft.com/ontology/Topic",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
-							PrefLabel:  "Apple",
-							Type:       "http://www.ft.com/ontology/Topic",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/ca26a873-dd01-11e8-9a17-6c96cfdf3997",
+						PrefLabel:  "Apple",
+						Type:       "http://www.ft.com/ontology/Topic",
+						IsFTAuthor: false,
 					},
 				},
 			},
@@ -403,51 +383,47 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 			publicThingsResponse: broaderResponse{
 				Things: map[string]Thing{},
 			},
-			suggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			suggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
-			expectedSuggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			expectedSuggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
@@ -459,51 +435,47 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 			},
 			publicThingsError:     fmt.Errorf("Error from publicThingsAPI"),
 			expectedErrorContains: "Error from publicThingsAPI",
-			suggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			suggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
-			expectedSuggestions: map[int][]Suggestion{
-				1: []Suggestion{
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+			expectedSuggestions: []Suggestion{
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						APIURL:     "http://api.ft.com/people/6f14ea94-690f-3ed4-98c7-b926683c735a",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
-					{
-						Predicate: "http://www.ft.com/ontology/annotation/mentions",
-						Concept: Concept{
-							ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
-							PrefLabel:  "Donald Kaberuka",
-							Type:       "http://www.ft.com/ontology/person/Person",
-							IsFTAuthor: false,
-						},
+				},
+				{
+					Predicate: "http://www.ft.com/ontology/annotation/mentions",
+					Concept: Concept{
+						ID:         "http://www.ft.com/thing/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						APIURL:     "http://api.ft.com/people/2d2657e2-dcff-11e8-a112-6c96cfdf3997",
+						PrefLabel:  "Donald Kaberuka",
+						Type:       "http://www.ft.com/ontology/person/Person",
+						IsFTAuthor: false,
 					},
 				},
 			},
@@ -530,7 +502,7 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 
 		excludeService := NewBroaderExcludeService("dummyURL", "things", publicThingsMock)
 
-		res, err := excludeService.excludeBroaderConcepts(testCase.suggestions, "test_tid", "")
+		res, err := excludeService.excludeBroaderConceptsFromResponse(SuggestionsResponse{testCase.suggestions}, "test_tid", "")
 		if err != nil {
 			ast.NotEmptyf(testCase.expectedErrorContains, "%s -> empty expected error", testCase.testName)
 			ast.Containsf(err.Error(), testCase.expectedErrorContains, "%s -> not expected error returned", testCase.testName)
@@ -539,20 +511,16 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 		}
 
 		// this is in here because the broaderExcludeService should return the same results as the ones that it received if an error occurrs
-		ast.Lenf(res, len(testCase.expectedSuggestions), "%s -> unexpected results len", testCase.testName)
-		for expectedIdx, expectedSourceResults := range testCase.expectedSuggestions {
-			actualResults, ok := res[expectedIdx]
-			ast.Truef(ok, "%s -> no source index %d found in the actual results", testCase.testName, expectedIdx)
-			for _, expectedSuggestion := range expectedSourceResults {
-				found := false
-				for _, actualSuggestion := range actualResults {
-					if actualSuggestion.ID == expectedSuggestion.ID {
-						found = true
-						break
-					}
+		ast.Lenf(res.Suggestions, len(testCase.expectedSuggestions), "%s -> unexpected results len", testCase.testName)
+		for _, expectedSuggestion := range testCase.expectedSuggestions {
+			found := false
+			for _, actualSuggestion := range res.Suggestions {
+				if actualSuggestion.ID == expectedSuggestion.ID {
+					found = true
+					break
 				}
-				ast.Truef(found, "%s -> suggestion(ID: %s) not found in results", testCase.testName, expectedSuggestion.ID)
 			}
+			ast.Truef(found, "%s -> suggestion(ID: %s) not found in results", testCase.testName, expectedSuggestion.ID)
 		}
 		publicThingsMock.AssertExpectations(t)
 	}

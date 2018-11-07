@@ -122,55 +122,6 @@ func (b *BroaderExcludeService) excludeBroaderConceptsFromResponse(suggestions S
 	return results, nil
 }
 
-// @TODO USE THIS ON MERGE
-func (b *BroaderExcludeService) excludeBroaderConcepts(suggestions map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {
-	var ids []string
-	for _, sourceSuggestions := range suggestions {
-		for _, suggestion := range sourceSuggestions {
-			ids = append(ids, fp.Base(suggestion.ID))
-		}
-	}
-
-	if len(ids) == 0 {
-		return suggestions, nil
-	}
-
-	results := make(map[int][]Suggestion)
-	broader, err := b.getBroaderConcepts(ids, tid)
-	if err != nil {
-		return suggestions, err
-	}
-
-	broaderConceptsChecker := make(map[string]bool)
-	for _, thing := range broader.Things {
-		for _, broaderConcept := range thing.BroaderConcepts {
-			broaderConceptsChecker[fp.Base(broaderConcept.ID)] = true
-		}
-	}
-	if len(broaderConceptsChecker) == 0 {
-		return suggestions, nil
-	}
-
-	for mapIdx, sourceSuggestions := range suggestions {
-		filteredSourceSuggestions := []Suggestion{}
-		for _, suggestion := range sourceSuggestions {
-			if broaderConceptsChecker[fp.Base(suggestion.ID)] {
-				if debugFlag != "" {
-					logger.WithTransactionID(tid).
-						WithField("ExcludedID", suggestion.ID).
-						WithField("ExcludedPrefLabel", suggestion.PrefLabel).
-						Info("Broader Concept excluded")
-				}
-				continue
-			}
-			filteredSourceSuggestions = append(filteredSourceSuggestions, suggestion)
-		}
-		results[mapIdx] = filteredSourceSuggestions
-	}
-
-	return results, nil
-}
-
 func (b *BroaderExcludeService) getBroaderConcepts(ids []string, tid string) (*broaderResponse, error) {
 	var result broaderResponse
 	preparedURL := fmt.Sprintf("%s/%s", strings.TrimRight(b.PublicThingsBaseURL, "/"), strings.Trim(b.PublicThingsEndpoint, "/"))

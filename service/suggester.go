@@ -42,8 +42,8 @@ type Suggester interface {
 }
 
 type AggregateSuggester struct {
-	Concordance    *ConcordanceService
 	Suggesters     []Suggester
+	Concordance    *ConcordanceService
 	BroaderExclude *BroaderExcludeService
 }
 

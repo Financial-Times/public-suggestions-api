@@ -84,6 +84,19 @@ func main() {
 		EnvVar: "CONCEPT_CONCORDANCES_ENDPOINT",
 	})
 
+	publicThingsAPIBaseURL := app.String(cli.StringOpt{
+		Name:   "public-things-api-base-url",
+		Value:  "http://public-things-api:8080",
+		Desc:   "The base URL for public things api",
+		EnvVar: "PUBLIC_THINGS_API_BASE_URL",
+	})
+	publicThingsEndpoint := app.String(cli.StringOpt{
+		Name:   "public-things-endpoint",
+		Value:  "/things",
+		Desc:   "The endpoint for public things api",
+		EnvVar: "PUBLIC_THINGS_ENDPOINT",
+	})
+
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
 
@@ -104,8 +117,10 @@ func main() {
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, falconSuggester, authorsSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), concordanceService.Check())
+		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
+
+		suggester := service.NewAggregateSuggester(concordanceService, broaderService, falconSuggester, authorsSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), concordanceService.Check(), broaderService.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

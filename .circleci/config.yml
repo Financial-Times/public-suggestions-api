@@ -63,6 +63,7 @@ jobs:
         environment:
           GOPATH: /go
           FALCON_SUGGESTION_API_BASE_URL: http://localhost:9000
+          PUBLIC_THINGS_API_BASE_URL: http://localhost:9000
       - image: peteclarkft/ersatz:stable
     steps:
       - checkout

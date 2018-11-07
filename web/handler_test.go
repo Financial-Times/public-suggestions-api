@@ -2,8 +2,10 @@ package web
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"errors"
@@ -93,6 +95,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	}}
 
 	mockClient := new(mockHttpClient)
+	mockPublicThings := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
@@ -109,14 +112,26 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
 
+	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(expectedResp, nil).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{}, nil)
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(
+		&service.AggregateSuggester{
+			Concordance:     mockConcordance,
+			Suggesters:      []service.Suggester{mockSuggester},
+			BroaderProvider: broaderService,
+		})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[{"id":"authors-suggestion-api","apiUrl":"apiurl2","type":"http://www.ft.com/ontology/person/Person","prefLabel":"prefLabel2","isFTAuthor":true}]}`, w.Body.String())
+
 	mockSuggester.AssertExpectations(t)
+	mockPublicThings.AssertExpectations(t)
+	mockClient.AssertExpectations(t)
 }
 
 func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T) {
@@ -141,6 +156,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockInternalConcResp := service.ConcordanceResponse{
@@ -155,15 +171,27 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 		Buffer: bytes.NewBuffer(expectedBody),
 	}
 
+	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource}}).Return(expectedResp, nil).Once()
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[{"id":"falcon-suggestion-api","apiUrl":"apiurl1","type":"http://www.ft.com/ontology/person/Person","prefLabel":"prefLabel1"}]}`, w.Body.String())
+
 	mockSuggester.AssertExpectations(t)
+	mockPublicThings.AssertExpectations(t)
+	mockClient.AssertExpectations(t)
 }
 
 func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
@@ -175,14 +203,25 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
 	expect.Equal(`{"message": "Error while reading payload"}`, w.Body.String())
-	mockSuggester.AssertExpectations(t) //no calls
+
+	mockSuggester.AssertExpectations(t)    //no calls
+	mockPublicThings.AssertExpectations(t) // no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
@@ -195,14 +234,26 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
 	expect.Equal(`{"message": "Payload should be a non-empty JSON object"}`, w.Body.String())
-	mockSuggester.AssertExpectations(t) //no calls
+
+	mockSuggester.AssertExpectations(t)    //no calls
+	mockPublicThings.AssertExpectations(t) //no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
@@ -215,14 +266,25 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
 	expect.Equal(`{"message": "Payload should be a non-empty JSON object"}`, w.Body.String())
-	mockSuggester.AssertExpectations(t) //no calls
+
+	mockSuggester.AssertExpectations(t)    //no calls
+	mockPublicThings.AssertExpectations(t) //no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
@@ -234,17 +296,28 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mockClient := new(mockHttpClient)
-	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
+	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+
 	mockSuggester.AssertExpectations(t)
+	mockPublicThings.AssertExpectations(t) //no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(t *testing.T) {
@@ -256,14 +329,26 @@ func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
 	expect.Equal(`{"message": "source flag incorrectly set"}`, w.Body.String())
-	mockSuggester.AssertExpectations(t) //no calls
+
+	mockSuggester.AssertExpectations(t)    //no calls
+	mockPublicThings.AssertExpectations(t) //no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T) {
@@ -275,17 +360,30 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	service.NoContentError = errors.New("No content error")
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{make([]service.Suggestion, 0)}, service.NoContentError)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{
+		Suggestions: make([]service.Suggestion, 0),
+	}, service.NoContentError)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+
 	mockSuggester.AssertExpectations(t)
+	mockPublicThings.AssertExpectations(t) //no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 //Might not happen at all if MetadataServices returns always 204 when there are no suggestions
@@ -298,16 +396,27 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
-
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[]}`, w.Body.String())
+
 	mockSuggester.AssertExpectations(t)
+	mockPublicThings.AssertExpectations(t) //no calls
+	mockClient.AssertExpectations(t)       //no calls
 }
 
 func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
@@ -319,8 +428,9 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	mockClient := new(mockHttpClient)
-	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 	mockSuggester := new(mockSuggesterService)
+	mockPublicThings := new(mockHttpClient)
+	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
 		service.Suggestion{
@@ -335,10 +445,20 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	}}, nil)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
 
-	handler := NewRequestHandler(&service.AggregateSuggester{mockConcordance, []service.Suggester{mockSuggester}})
+	broaderService := &service.BroaderConceptsProvider{
+		Client: mockPublicThings,
+	}
+	handler := NewRequestHandler(&service.AggregateSuggester{
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
+	})
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusServiceUnavailable, w.Code)
 	expect.Equal(`{"message": "aggregating suggestions failed!"}`, w.Body.String())
+
 	mockSuggester.AssertExpectations(t)
+	mockPublicThings.AssertExpectations(t)
+	mockClient.AssertExpectations(t)
 }

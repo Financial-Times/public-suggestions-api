@@ -117,7 +117,7 @@ func main() {
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		broaderService := service.NewBroaderExcludeService(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
+		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
 		suggester := service.NewAggregateSuggester(concordanceService, broaderService, falconSuggester, authorsSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), concordanceService.Check(), broaderService.Check())

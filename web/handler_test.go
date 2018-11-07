@@ -113,16 +113,16 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer}, nil)
 
 	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(expectedResp, nil).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{}, nil)
 	handler := NewRequestHandler(
 		&service.AggregateSuggester{
-			Concordance:    mockConcordance,
-			Suggesters:     []service.Suggester{mockSuggester},
-			BroaderExclude: broaderService,
+			Concordance:     mockConcordance,
+			Suggesters:      []service.Suggester{mockSuggester},
+			BroaderProvider: broaderService,
 		})
 	handler.HandleSuggestion(w, req)
 
@@ -172,7 +172,7 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	}
 
 	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
@@ -180,9 +180,9 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithAuthorsTME(t *testing.T)
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource}}).Return(expectedResp, nil).Once()
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -206,13 +206,13 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -237,14 +237,14 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -269,13 +269,13 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -302,13 +302,13 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -332,14 +332,14 @@ func TestRequestHandler_HandleSuggestionErrorInvalidSourceParamOnGetSuggestions(
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -368,13 +368,13 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 		Suggestions: make([]service.Suggestion, 0),
 	}, service.NoContentError)
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -400,14 +400,14 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: []string{service.TmeSource, service.AuthorsSource}}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -445,13 +445,13 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	}}, nil)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
 
-	broaderService := &service.BroaderExcludeService{
+	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:    mockConcordance,
-		Suggesters:     []service.Suggester{mockSuggester},
-		BroaderExclude: broaderService,
+		Concordance:     mockConcordance,
+		Suggesters:      []service.Suggester{mockSuggester},
+		BroaderProvider: broaderService,
 	})
 	handler.HandleSuggestion(w, req)
 

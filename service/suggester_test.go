@@ -382,8 +382,8 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, suggestionApi, suggestionApi)
+	broaderConceptsProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderConceptsProvider, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 2)
@@ -405,8 +405,8 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusOK,
 	}, nil)
-	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, suggestionApi, suggestionApi)
+	broaderConceptsProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderConceptsProvider, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 0)
@@ -453,8 +453,8 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusOK,
 	}, nil)
-	broaderExcluder := NewBroaderExcludeService("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderExcluder, suggestionApi, suggestionApi)
+	broaderConceptsProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderConceptsProvider, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: []string{AuthorsSource}})
 
 	expect.Len(response.Suggestions, 1)

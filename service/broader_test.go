@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestBroaderExcludeService_CheckHealth(t *testing.T) {
+func TestBroaderConceptsProvider_CheckHealth(t *testing.T) {
 	expect := assert.New(t)
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(200).Once()
 	server := mockServer.startMockServer(t)
 
-	suggester := NewBroaderExcludeService(server.URL, "/__gtg", http.DefaultClient)
+	suggester := NewBroaderConceptsProvider(server.URL, "/__gtg", http.DefaultClient)
 	check := suggester.Check()
 	checkResult, err := check.Checker()
 
@@ -34,13 +34,13 @@ func TestBroaderExcludeService_CheckHealth(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
-func TestBroaderExcludeService_CheckHealthUnhealthy(t *testing.T) {
+func TestBroaderConceptsProvider_CheckHealthUnhealthy(t *testing.T) {
 	expect := assert.New(t)
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
 
-	suggester := NewBroaderExcludeService(server.URL, "/__gtg", http.DefaultClient)
+	suggester := NewBroaderConceptsProvider(server.URL, "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
@@ -49,10 +49,10 @@ func TestBroaderExcludeService_CheckHealthUnhealthy(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
-func TestBroaderExcludeService_CheckHealthErrorOnNewRequest(t *testing.T) {
+func TestBroaderConceptsProvider_CheckHealthErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
 
-	suggester := NewBroaderExcludeService(":/", "/__gtg", http.DefaultClient)
+	suggester := NewBroaderConceptsProvider(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
@@ -60,12 +60,12 @@ func TestBroaderExcludeService_CheckHealthErrorOnNewRequest(t *testing.T) {
 	expect.Empty(checkResult)
 }
 
-func TestBroaderExcludeService_CheckHealthErrorOnRequestDo(t *testing.T) {
+func TestBroaderConceptsProvider_CheckHealthErrorOnRequestDo(t *testing.T) {
 	expect := assert.New(t)
 	mockClient := new(mockHttpClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
-	suggester := NewBroaderExcludeService("http://test-url", "/__gtg", mockClient)
+	suggester := NewBroaderConceptsProvider("http://test-url", "/__gtg", mockClient)
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
@@ -500,7 +500,7 @@ func TestBroaderService_excludeBroaderConceptsFromResponse(t *testing.T) {
 			).Once()
 		}
 
-		excludeService := NewBroaderExcludeService("dummyURL", "things", publicThingsMock)
+		excludeService := NewBroaderConceptsProvider("dummyURL", "things", publicThingsMock)
 
 		res, err := excludeService.excludeBroaderConceptsFromResponse(SuggestionsResponse{testCase.suggestions}, "test_tid", "")
 		if err != nil {
@@ -510,7 +510,7 @@ func TestBroaderService_excludeBroaderConceptsFromResponse(t *testing.T) {
 			ast.NoErrorf(err, "%s -> unexpected error during excluding broader concepts", testCase.testName)
 		}
 
-		// this is in here because the broaderExcludeService should return the same results as the ones that it received if an error occurrs
+		// this is in here because the broaderConceptsProvider should return the same results as the ones that it received if an error occurrs
 		ast.Lenf(res.Suggestions, len(testCase.expectedSuggestions), "%s -> unexpected results len", testCase.testName)
 		for _, expectedSuggestion := range testCase.expectedSuggestions {
 			found := false

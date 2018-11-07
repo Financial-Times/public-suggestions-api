@@ -12,7 +12,7 @@ import (
 	logger "github.com/Financial-Times/go-logger"
 )
 
-type BroaderExcludeService struct {
+type BroaderConceptsProvider struct {
 	systemID             string
 	name                 string
 	PublicThingsBaseURL  string
@@ -21,8 +21,8 @@ type BroaderExcludeService struct {
 	failureImpact        string
 }
 
-func NewBroaderExcludeService(publicThingsAPIBaseURL, publicThingsEndpoint string, client Client) *BroaderExcludeService {
-	return &BroaderExcludeService{
+func NewBroaderConceptsProvider(publicThingsAPIBaseURL, publicThingsEndpoint string, client Client) *BroaderConceptsProvider {
+	return &BroaderConceptsProvider{
 		PublicThingsBaseURL:  publicThingsAPIBaseURL,
 		PublicThingsEndpoint: publicThingsEndpoint,
 		Client:               client,
@@ -45,7 +45,7 @@ type BroaderConcept struct {
 	ID string `json:"id"`
 }
 
-func (b *BroaderExcludeService) Check() v1_1.Check {
+func (b *BroaderConceptsProvider) Check() v1_1.Check {
 	return v1_1.Check{
 		ID:               b.systemID,
 		BusinessImpact:   b.failureImpact,
@@ -57,7 +57,7 @@ func (b *BroaderExcludeService) Check() v1_1.Check {
 	}
 }
 
-func (b *BroaderExcludeService) healthCheck() (string, error) {
+func (b *BroaderConceptsProvider) healthCheck() (string, error) {
 	req, err := http.NewRequest("GET", b.PublicThingsBaseURL+"/__gtg", nil)
 	if err != nil {
 		return "", err
@@ -78,7 +78,7 @@ func (b *BroaderExcludeService) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", b.name), nil
 }
 
-func (b *BroaderExcludeService) excludeBroaderConceptsFromResponse(suggestions SuggestionsResponse, tid string, debugFlag string) (SuggestionsResponse, error) {
+func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions SuggestionsResponse, tid string, debugFlag string) (SuggestionsResponse, error) {
 	var ids []string
 	for _, suggestion := range suggestions.Suggestions {
 		ids = append(ids, fp.Base(suggestion.ID))
@@ -122,7 +122,7 @@ func (b *BroaderExcludeService) excludeBroaderConceptsFromResponse(suggestions S
 	return results, nil
 }
 
-func (b *BroaderExcludeService) getBroaderConcepts(ids []string, tid string) (*broaderResponse, error) {
+func (b *BroaderConceptsProvider) getBroaderConcepts(ids []string, tid string) (*broaderResponse, error) {
 	var result broaderResponse
 	preparedURL := fmt.Sprintf("%s/%s", strings.TrimRight(b.PublicThingsBaseURL, "/"), strings.Trim(b.PublicThingsEndpoint, "/"))
 	req, err := http.NewRequest("GET", preparedURL, nil)

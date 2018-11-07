@@ -193,10 +193,10 @@ func TestRequestHandler_all(t *testing.T) {
 	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
-	broaderExcluder := service.NewBroaderExcludeService(mockServer.URL, "/things", c)
+	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
 
-	suggester := service.NewAggregateSuggester(concordance, broaderExcluder, falconSuggester, authorsSuggester)
-	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), broaderExcluder.Check())
+	suggester := service.NewAggregateSuggester(concordance, broaderProvider, falconSuggester, authorsSuggester)
+	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), broaderProvider.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)

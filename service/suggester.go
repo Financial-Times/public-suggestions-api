@@ -42,9 +42,9 @@ type Suggester interface {
 }
 
 type AggregateSuggester struct {
-	Suggesters     []Suggester
-	Concordance    *ConcordanceService
-	BroaderExclude *BroaderExcludeService
+	Suggesters      []Suggester
+	Concordance     *ConcordanceService
+	BroaderProvider *BroaderConceptsProvider
 }
 
 type SuggestionApi struct {
@@ -144,11 +144,11 @@ func NewConcordance(internalConcordancesApiBaseURL, internalConcordancesEndpoint
 	}
 }
 
-func NewAggregateSuggester(concordance *ConcordanceService, broaderExcludingService *BroaderExcludeService, suggesters ...Suggester) *AggregateSuggester {
+func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, suggesters ...Suggester) *AggregateSuggester {
 	return &AggregateSuggester{
-		Suggesters:     suggesters,
-		Concordance:    concordance,
-		BroaderExclude: broaderExcludingService,
+		Suggesters:      suggesters,
+		Concordance:     concordance,
+		BroaderProvider: broaderConceptsProvider,
 	}
 }
 
@@ -195,7 +195,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		return withoutDeprecated, err
 	}
 
-	results, err := suggester.BroaderExclude.excludeBroaderConceptsFromResponse(withoutDeprecated, tid, flags.Debug)
+	results, err := suggester.BroaderProvider.excludeBroaderConceptsFromResponse(withoutDeprecated, tid, flags.Debug)
 	if err != nil {
 		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
 	} else {

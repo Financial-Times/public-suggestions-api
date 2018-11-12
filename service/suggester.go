@@ -81,7 +81,6 @@ type Suggester interface {
 	GetName() string
 }
 
-// -> set requestAnyway=true for ignoring the flag checks for that specific suggester
 type SuggestionApi struct {
 	name                 string
 	sourceName           string

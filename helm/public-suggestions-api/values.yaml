@@ -21,6 +21,8 @@ env:
   AUTHORS_SUGGESTION_ENDPOINT: "" # This should be defined in the specific app-configs folder
   ONTOTEXT_SUGGESTION_API_BASE_URL: "" # This should be defined in the specific app-configs folder
   ONTOTEXT_SUGGESTION_ENDPOINT: "" # This should be defined in the specific app-configs folder
+  PUBLIC_THINGS_API_BASE_URL: "" # This should be defined in the specific app-configs folder
+  PUBLIC_THINGS_ENDPOINT: "" # This should be defined in the specific app-configs folder
   DEFAULT_SOURCE_PERSON: "" # This should be defined in the specific app-configs folder
   DEFAULT_SOURCE_ORGANISATIONS: "" # This should be defined in the specific app-configs folder
   DEFAULT_SOURCE_LOCATIONS: "" # This should be defined in the specific app-configs folder

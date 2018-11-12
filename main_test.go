@@ -359,6 +359,10 @@ func TestRequestHandler_all(t *testing.T) {
 						}
 					}
 				}`))
+		case strings.Contains(r.RequestURI, "/things"):
+			w.Write([]byte(`{
+					"things": {}
+				}`))
 		}
 	}))
 
@@ -379,8 +383,10 @@ func TestRequestHandler_all(t *testing.T) {
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
 	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
-	suggester := service.NewAggregateSuggester(concordance, defaultConceptsSources, falconSuggester, authorsSuggester, ontotextSuggester)
-	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check())
+	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
+
+	suggester := service.NewAggregateSuggester(concordance, broaderProvider, defaultConceptsSources, falconSuggester, authorsSuggester, ontotextSuggester)
+	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)

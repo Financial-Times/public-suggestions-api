@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"html"
 	"regexp"
 	"strings"
@@ -69,4 +70,45 @@ func DefaultValueTransformer(input string) string {
 		return "."
 	}
 	return input
+}
+
+func getXmlSuggestionRequestFromJson(jsonData []byte) ([]byte, error) {
+
+	var jsonInput JsonInput
+
+	err := json.Unmarshal(jsonData, &jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonInput.Byline = TransformText(jsonInput.Byline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Body = TransformText(jsonInput.Body,
+		PullTagTransformer,
+		WebPullTagTransformer,
+		TableTagTransformer,
+		PromoBoxTagTransformer,
+		WebInlinePictureTagTransformer,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+	jsonInput.Headline = TransformText(jsonInput.Headline,
+		HtmlEntityTransformer,
+		TagsRemover,
+		OuterSpaceTrimmer,
+		DuplicateWhiteSpaceRemover,
+	)
+
+	data, err := json.Marshal(jsonInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

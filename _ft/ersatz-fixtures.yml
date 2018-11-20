@@ -19,7 +19,114 @@ fixtures:
             apiUrl: "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc494"
             prefLabel: "Adam Samson"
             type: "http://www.ft.com/ontology/person/Person"
+          - id: http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490
+            apiUrl: http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490
+            prefLabel: London
+            type: http://www.ft.com/ontology/Location
+            predicate: http://www.ft.com/ontology/annotation/about
+          - id: http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380
+            apiUrl: http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a30
+            prefLabel: Eric Platt
+            type: http://www.ft.com/ontology/person/Person
+            predicate: http://www.ft.com/ontology/annotation/about
+          - id: http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50
+            apiUrl: http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50
+            prefLabel: Apple
+            type: http://www.ft.com/ontology/organisation/Organisation
+            predicate: http://www.ft.com/ontology/annotation/about
+          - id: http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990
+            apiUrl: http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990
+            prefLabel: London Politics
+            type: http://www.ft.com/ontology/Topic
+            predicate: http://www.ft.com/ontology/annotation/about
       headers:
         content-type: application/json
       status: 200
-      
+  /content/suggest/ontotext:
+    post:
+      body:
+        suggestions:
+          - id: http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495
+            apiUrl: http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495
+            prefLabel: London
+            type: http://www.ft.com/ontology/Location
+            predicate: http://www.ft.com/ontology/annotation/about
+          - id: http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385
+            apiUrl: http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385
+            prefLabel: Eric Platt
+            type: http://www.ft.com/ontology/person/Person
+            predicate: http://www.ft.com/ontology/annotation/about
+          - id: http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55
+            apiUrl: http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55
+            prefLabel: Apple
+            type: http://www.ft.com/ontology/organisation/Organisation
+            predicate: http://www.ft.com/ontology/annotation/about
+      headers:
+        content-type: application/json
+      status: 200
+  /content/suggest/authors:
+    post:
+      body:
+        suggestions:
+          - predicate: http://www.ft.com/ontology/annotation/hasAuthor
+            id: http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc494
+            apiUrl: http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc494
+            prefLabel: Adam Samson
+            type: http://www.ft.com/ontology/person/Person
+            isFTAuthor: true
+          - predicate: http://www.ft.com/ontology/annotation/hasAuthor
+            id: http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a51
+            apiUrl: http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a51
+            prefLabel: Michael Hunter
+            type: http://www.ft.com/ontology/person/Person
+            isFTAuthor: true
+      headers:
+        content-type: application/json
+      status: 200
+  /internalconcordances:
+    get:
+      headers:
+        content-type: application/json
+      status: 200
+      body:
+        concepts:
+          f758ef56-c40a-3162-91aa-3e8a3aabc490:
+            id: http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490
+            apiUrl: http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490
+            prefLabel: London
+            type: http://www.ft.com/ontology/Location
+          64302452-e369-4ddb-88fa-9adc5124a380:
+            id: http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380
+            apiUrl: http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a30
+            prefLabel: Eric Platt
+            type: http://www.ft.com/ontology/person/Person
+          9332270e-f959-3f55-9153-d30acd0d0a50:
+            id: http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50
+            apiUrl: http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50
+            prefLabel: Apple
+            type: http://www.ft.com/ontology/organisation/Organisation
+          7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990:
+            id: http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990
+            apiUrl: http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990
+            prefLabel: London Politics
+            type: http://www.ft.com/ontology/Topic
+          f758ef56-c40a-3162-91aa-3e8a3aabc494:
+            predicate: http://www.ft.com/ontology/annotation/hasAuthor
+            id: http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc494
+            apiUrl: http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc494
+            prefLabel: Adam Samson
+            type: http://www.ft.com/ontology/person/Person
+            isFTAuthor: true
+          9332270e-f959-3f55-9153-d30acd0d0a51:
+            predicate: http://www.ft.com/ontology/annotation/hasAuthor
+            id: http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a51
+            apiUrl: http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a51
+            prefLabel: Michael Hunter
+            type: http://www.ft.com/ontology/person/Person
+            isFTAuthor: true
+  /__health:
+    get:
+      status: 200
+  /__gtg:
+    get:
+      status: 200

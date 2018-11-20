@@ -71,6 +71,19 @@ func main() {
 		Desc:   "The endpoint for authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
+	ontotextSuggestionApiBaseURL := app.String(cli.StringOpt{
+		Name:   "ontotext-suggestion-api-base-url",
+		Value:  "http://ontotext-suggestion-api:8080",
+		Desc:   "The base URL to ontotext suggestion api",
+		EnvVar: "ONTOTEXT_SUGGESTION_API_BASE_URL",
+	})
+	ontotextSuggestionEndpoint := app.String(cli.StringOpt{
+		Name:   "ontotext-suggestion-endpoint",
+		Value:  "/content/suggest/ontotext",
+		Desc:   "The endpoint for ontotext suggestion api",
+		EnvVar: "ONTOTEXT_SUGGESTION_ENDPOINT",
+	})
+
 	internalConcordancesApiBaseURL := app.String(cli.StringOpt{
 		Name:   "internal-concordances-api-base-url",
 		Value:  "http://internal-concordances:8080",
@@ -97,6 +110,31 @@ func main() {
 		EnvVar: "PUBLIC_THINGS_ENDPOINT",
 	})
 
+	defaultSourcePerson := app.String(cli.StringOpt{
+		Name:   "default-source-person",
+		Value:  service.TmeSource,
+		Desc:   "The default source for person suggestions",
+		EnvVar: "DEFAULT_SOURCE_PERSON",
+	})
+	defaultSourceOrganisation := app.String(cli.StringOpt{
+		Name:   "default-source-organisation",
+		Value:  service.TmeSource,
+		Desc:   "The default source for organisations suggestions",
+		EnvVar: "DEFAULT_SOURCE_ORGANISATION",
+	})
+	defaultSourceLocation := app.String(cli.StringOpt{
+		Name:   "default-source-location",
+		Value:  service.TmeSource,
+		Desc:   "The default source for locations suggestions",
+		EnvVar: "DEFAULT_SOURCE_LOCATION",
+	})
+	defaultSourceTopic := app.String(cli.StringOpt{
+		Name:   "default-source-topic",
+		Value:  service.TmeSource,
+		Desc:   "The default source for topics suggestions",
+		EnvVar: "DEFAULT_SOURCE_TOPIC",
+	})
+
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
 
@@ -114,13 +152,22 @@ func main() {
 			Transport: tr,
 			Timeout:   10 * time.Second,
 		}
+
+		defaultSources := map[string]string{
+			service.PersonSourceParam:       *defaultSourcePerson,
+			service.LocationSourceParam:     *defaultSourceLocation,
+			service.OrganisationSourceParam: *defaultSourceOrganisation,
+			service.TopicSourceParam:        *defaultSourceTopic,
+			service.PseudoConceptTypeAuthor: service.AuthorsSource,
+		}
 		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
-		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
+		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
 		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
-		suggester := service.NewAggregateSuggester(concordanceService, broaderService, falconSuggester, authorsSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), concordanceService.Check(), broaderService.Check())
+		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
+		suggester := service.NewAggregateSuggester(concordanceService, broaderService, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

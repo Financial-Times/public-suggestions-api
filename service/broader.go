@@ -78,16 +78,19 @@ func (b *BroaderConceptsProvider) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", b.name), nil
 }
 
-func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions SuggestionsResponse, tid string, debugFlag string) (SuggestionsResponse, error) {
+func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {
 	var ids []string
-	for _, suggestion := range suggestions.Suggestions {
-		ids = append(ids, fp.Base(suggestion.ID))
+	for _, sourceSuggestions := range suggestions {
+		for _, suggestion := range sourceSuggestions {
+			ids = append(ids, fp.Base(suggestion.ID))
+		}
 	}
 
 	if len(ids) == 0 {
 		return suggestions, nil
 	}
 
+	results := make(map[int][]Suggestion)
 	broader, err := b.getBroaderConcepts(ids, tid)
 	if err != nil {
 		return suggestions, err
@@ -103,20 +106,20 @@ func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions
 		return suggestions, nil
 	}
 
-	results := SuggestionsResponse{
-		Suggestions: make([]Suggestion, 0),
-	}
-	for _, suggestion := range suggestions.Suggestions {
-		if broaderConceptsChecker[fp.Base(suggestion.ID)] {
-			if debugFlag != "" {
-				logger.WithTransactionID(tid).
-					WithField("ExcludedID", suggestion.ID).
-					WithField("ExcludedPrefLabel", suggestion.PrefLabel).
-					Info("Broader Concept excluded")
+	for mapIdx, sourceSuggestions := range suggestions {
+		filteredSourceSuggestions := []Suggestion{}
+		for _, suggestion := range sourceSuggestions {
+			if broaderConceptsChecker[fp.Base(suggestion.ID)] {
+				if debugFlag != "" {
+					logger.WithField("ExcludedID", suggestion.ID).
+						WithField("ExcludedPrefLabel", suggestion.PrefLabel).
+						Info("Broader Concept excluded")
+				}
+				continue
 			}
-			continue
+			filteredSourceSuggestions = append(filteredSourceSuggestions, suggestion)
 		}
-		results.Suggestions = append(results.Suggestions, suggestion)
+		results[mapIdx] = filteredSourceSuggestions
 	}
 
 	return results, nil

@@ -41,6 +41,16 @@ spec:
           value: "{{ .Values.env.AUTHORS_SUGGESTION_API_BASE_URL }}"
         - name: AUTHORS_SUGGESTION_ENDPOINT
           value: "{{ .Values.env.AUTHORS_SUGGESTION_ENDPOINT }}"
+        - name: ONTOTEXT_SUGGESTION_API_BASE_URL
+          value: "{{ .Values.env.ONTOTEXT_SUGGESTION_API_BASE_URL }}"
+        - name: ONTOTEXT_SUGGESTION_ENDPOINT
+          value: "{{ .Values.env.ONTOTEXT_SUGGESTION_ENDPOINT }}"
+        - name: DEFAULT_SOURCE_PERSON
+          value: "{{ .Values.env.DEFAULT_SOURCE_PERSON }}"
+        - name: DEFAULT_SOURCE_ORGANISATIONS
+          value: "{{ .Values.env.DEFAULT_SOURCE_ORGANISATIONS }}"
+        - name: DEFAULT_SOURCE_LOCATIONS
+          value: "{{ .Values.env.DEFAULT_SOURCE_LOCATIONS }}"
         - name: CONCEPT_CONCORDANCES_API_BASE_URL
           value: "{{ .Values.env.CONCEPT_CONCORDANCES_API_BASE_URL }}"
         - name: CONCEPT_CONCORDANCES_ENDPOINT

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 type ConceptBlacklister interface {
@@ -26,8 +27,13 @@ func NewConceptBlacklister(baseUrl string, endpoint string, client Client) Conce
 	return &Blacklister{baseUrl, endpoint, client}
 }
 
-func (b *Blacklister) IsBlacklisted(uuid string, bl Blacklist) bool {
-	return contains(bl.Uuids, uuid)
+func (b *Blacklister) IsBlacklisted(conceptId string, bl Blacklist) bool {
+	for _, uuid := range bl.Uuids {
+		if strings.Contains(conceptId, uuid) {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *Blacklister) GetBlacklist(tid string) (Blacklist, error) {

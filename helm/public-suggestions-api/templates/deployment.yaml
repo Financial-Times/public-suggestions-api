@@ -59,6 +59,10 @@ spec:
           value: "{{ .Values.env.PUBLIC_THINGS_API_BASE_URL }}"
         - name: PUBLIC_THINGS_ENDPOINT
           value: "{{ .Values.env.PUBLIC_THINGS_ENDPOINT }}"
+        - name: CONCEPT_BLACKLISTER_BASE_URL
+          value: "{{ .Values.env.CONCEPT_BLACKLISTER_BASE_URL }}"
+        - name: CONCEPT_BLACKLISTER_ENDPOINT
+          value: "{{ .Values.env.CONCEPT_BLACKLISTER_ENDPOINT }}"
         ports:
         - containerPort: 8080
         livenessProbe:

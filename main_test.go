@@ -363,6 +363,10 @@ func TestRequestHandler_all(t *testing.T) {
 			w.Write([]byte(`{
 					"things": {}
 				}`))
+		case strings.Contains(r.RequestURI, "/blacklist"):
+			w.Write([]byte(`{
+					"uuids": []
+				}`))
 		}
 	}))
 
@@ -384,8 +388,9 @@ func TestRequestHandler_all(t *testing.T) {
 	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
 	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
+	blacklister := service.NewConceptBlacklister(mockServer.URL, "/blacklist", c)
 
-	suggester := service.NewAggregateSuggester(concordance, broaderProvider, defaultConceptsSources, falconSuggester, authorsSuggester, ontotextSuggester)
+	suggester := service.NewAggregateSuggester(concordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, authorsSuggester, ontotextSuggester)
 	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {

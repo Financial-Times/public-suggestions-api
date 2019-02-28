@@ -20,7 +20,7 @@ type Blacklister struct {
 }
 
 type Blacklist struct {
-	Uuids []string `json:"uuids"`
+	UUIDS []string `json:"uuids"`
 }
 
 func NewConceptBlacklister(baseUrl string, endpoint string, client Client) ConceptBlacklister {
@@ -28,7 +28,7 @@ func NewConceptBlacklister(baseUrl string, endpoint string, client Client) Conce
 }
 
 func (b *Blacklister) IsBlacklisted(conceptId string, bl Blacklist) bool {
-	for _, uuid := range bl.Uuids {
+	for _, uuid := range bl.UUIDS {
 		if strings.Contains(conceptId, uuid) {
 			return true
 		}
@@ -67,13 +67,4 @@ func (b *Blacklister) GetBlacklist(tid string) (Blacklist, error) {
 		return Blacklist{}, err
 	}
 	return blacklist, nil
-}
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }

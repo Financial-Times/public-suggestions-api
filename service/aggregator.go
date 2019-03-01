@@ -86,7 +86,9 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	// preserve results order
 	for i := 0; i < len(suggester.Suggesters); i++ {
 		for _, suggestion := range responseMap[i] {
-			if !suggester.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
+			if suggester.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
+				log.WithTransactionID(tid).Info("Suppressing suggestion for concept %v", suggestion.ID)
+			} else {
 				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
 			}
 		}

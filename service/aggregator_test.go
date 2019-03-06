@@ -110,7 +110,16 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientError)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, falconSuggester, authorsSuggester)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, authorsSuggester)
 
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
@@ -460,7 +469,16 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
 		broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, falconSuggester, ontotextSuggester)
+
+		blacklisterMock := new(mockHttpClient)
+		blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body: ioutil.NopCloser(strings.NewReader(
+				`{"uuids":[]}`)),
+			StatusCode: http.StatusOK,
+		}, nil)
+		blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, ontotextSuggester)
 
 		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
 		expect.NoError(err)
@@ -664,7 +682,16 @@ func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
 		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
 		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
 		broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, falconSuggester, ontotextSuggester)
+
+		blacklisterMock := new(mockHttpClient)
+		blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			Body: ioutil.NopCloser(strings.NewReader(
+				`{"uuids":[]}`)),
+			StatusCode: http.StatusOK,
+		}, nil)
+		blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, ontotextSuggester)
 
 		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
 		expect.NoError(err)
@@ -741,7 +768,16 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, suggestionAPI, suggestionAPI)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionAPI, suggestionAPI)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Error(err)
@@ -802,7 +838,21 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, suggestionAPI, suggestionAPI)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil).Once()
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil).Once()
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionAPI, suggestionAPI)
 
 	// 503
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -889,7 +939,16 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	defaultConceptsSources := buildDefaultConceptSources()
 
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, suggestionApi, suggestionApi)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.Len(response.Suggestions, 2)
@@ -960,7 +1019,16 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, suggestionApi, suggestionApi)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.NoError(err)
@@ -986,7 +1054,16 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 
 	defaultConceptsSources := buildDefaultConceptSources()
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, suggestionApi, suggestionApi)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.NoError(err)
@@ -1041,13 +1118,185 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 
 	defaultConceptsSources := buildDefaultConceptSources()
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, defaultConceptsSources, suggestionApi, suggestionApi)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
 
 	expect.Equal(response.Suggestions[0].Concept.ID, "authors-suggestion-api")
+
+	suggestionApi.AssertExpectations(t)
+}
+
+func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
+	expect := assert.New(t)
+
+	suggestionApi := new(mockSuggestionApi)
+	mockClient := new(mockHttpClient)
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+
+	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       ontologyPersonType},
+		},
+	},
+	}
+	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType},
+		},
+	},
+	}
+
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", falconSuggestion.Suggestions, mock.Anything).Return(falconSuggestion.Suggestions).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
+
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
+
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":["falcon-suggestion-api"]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+
+	expect.Len(response.Suggestions, 1)
+
+	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
+
+	suggestionApi.AssertExpectations(t)
+}
+
+func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
+	expect := assert.New(t)
+
+	suggestionApi := new(mockSuggestionApi)
+	mockClient := new(mockHttpClient)
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+
+	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: false,
+				ID:         "falcon-suggestion-api",
+				APIURL:     "apiurl1",
+				PrefLabel:  "prefLabel1",
+				Type:       ontologyPersonType},
+		},
+	},
+	}
+	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+		{
+			Predicate: "predicate",
+			Concept: Concept{
+				IsFTAuthor: true,
+				ID:         "authors-suggestion-api",
+				APIURL:     "apiurl2",
+				PrefLabel:  "prefLabel2",
+				Type:       ontologyPersonType},
+		},
+	},
+	}
+
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", falconSuggestion.Suggestions, mock.Anything).Return(falconSuggestion.Suggestions).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
+
+	mockInternalConcResp := ConcordanceResponse{
+		Concepts: make(map[string]Concept),
+	}
+	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	}
+	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
+		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+	}
+	expectedBody, err := json.Marshal(&mockInternalConcResp)
+	require.NoError(t, err)
+	buffer := &ClosingBuffer{
+		Buffer: bytes.NewBuffer(expectedBody),
+	}
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
+
+	mockClientPublicThings := new(mockHttpClient)
+	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body:       ioutil.NopCloser(strings.NewReader("")),
+		StatusCode: http.StatusOK,
+	}, nil)
+
+	defaultConceptsSources := buildDefaultConceptSources()
+
+	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"message":"server error"}`)),
+		StatusCode: http.StatusInternalServerError,
+	}, nil)
+	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+
+	expect.Len(response.Suggestions, 2)
+
+	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
+	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
 	suggestionApi.AssertExpectations(t)
 }

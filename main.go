@@ -135,6 +135,19 @@ func main() {
 		EnvVar: "DEFAULT_SOURCE_TOPIC",
 	})
 
+	conceptBlacklisterBaseUrl := app.String(cli.StringOpt{
+		Name:   "concept-blacklister-base-url",
+		Value:  "http://concept-suggestions-blacklister:8080",
+		Desc:   "The base URL for concept suggester blacklister",
+		EnvVar: "CONCEPT_BLACKLISTER_BASE_URL",
+	})
+	conceptBlacklisterEndpoint := app.String(cli.StringOpt{
+		Name:   "concept-blacklister-endpoint",
+		Value:  "/blacklist",
+		Desc:   "The endpoint for concept suggester blacklister",
+		EnvVar: "CONCEPT_BLACKLISTER_ENDPOINT",
+	})
+
 	log.InitDefaultLogger(*appName)
 	log.Infof("[Startup] public-suggestions-api is starting")
 
@@ -166,8 +179,9 @@ func main() {
 		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, broaderService, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check())
+		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
+		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

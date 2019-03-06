@@ -12,6 +12,8 @@ env:
   CONCEPT_CONCORDANCES_ENDPOINT: "/internalconcordances"
   PUBLIC_THINGS_API_BASE_URL: "http://public-things-api:8080"
   PUBLIC_THINGS_ENDPOINT: "/things"
+  CONCEPT_BLACKLISTER_BASE_URL: "http://concept-suggestions-blacklister:8080"
+  CONCEPT_BLACKLISTER_ENDPOINT: "/blacklist"
   DEFAULT_SOURCE_PERSON: "tme"
   DEFAULT_SOURCE_ORGANISATIONS: "tme"
   DEFAULT_SOURCE_LOCATIONS: "tme"

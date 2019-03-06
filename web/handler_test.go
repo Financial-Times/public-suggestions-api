@@ -127,11 +127,21 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{}, nil)
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -190,11 +200,20 @@ func TestRequestHandler_HandleSuggestionSuccessfullyWithPersonFlagTme(t *testing
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 
 	handler.HandleSuggestion(w, req)
@@ -223,11 +242,21 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 		Client: mockPublicThings,
 	}
 	defaultConceptsSources := buildDefaultConceptSources()
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -256,11 +285,21 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 		Client: mockPublicThings,
 	}
 	defaultConceptsSources := buildDefaultConceptSources()
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -289,11 +328,21 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 		Client: mockPublicThings,
 	}
 	defaultConceptsSources := buildDefaultConceptSources()
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -324,11 +373,21 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -356,11 +415,21 @@ func TestRequestHandler_HandleSuggestionErrorInvalidLocationParamOnGetSuggestion
 		Client: mockPublicThings,
 	}
 	defaultConceptsSources := buildDefaultConceptSources()
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -392,11 +461,21 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -428,11 +507,20 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 
@@ -474,11 +562,21 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
+
+	blacklisterMock := new(mockHttpClient)
+	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		Body: ioutil.NopCloser(strings.NewReader(
+			`{"uuids":[]}`)),
+		StatusCode: http.StatusOK,
+	}, nil)
+	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
 		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
+		Blacklister:     blacklister,
 	})
 	handler.HandleSuggestion(w, req)
 

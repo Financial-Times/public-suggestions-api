@@ -13,15 +13,17 @@ type AggregateSuggester struct {
 	DefaultSource   map[string]string
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider
+	Blacklister     ConceptBlacklister
 	Suggesters      []Suggester
 }
 
-func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, defaultTypesSources map[string]string, suggesters ...Suggester) *AggregateSuggester {
+func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, blacklister ConceptBlacklister, defaultTypesSources map[string]string, suggesters ...Suggester) *AggregateSuggester {
 	return &AggregateSuggester{
 		Concordance:     concordance,
 		DefaultSource:   defaultTypesSources,
 		Suggesters:      suggesters,
 		BroaderProvider: broaderConceptsProvider,
+		Blacklister:     blacklister,
 	}
 }
 
@@ -34,6 +36,9 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		data = payload
 	}
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
+
+	blacklistChannel := make(chan Blacklist, 1)
+	go fetchBlacklist(suggester.Blacklister, blacklistChannel, tid)
 
 	var mutex = sync.Mutex{}
 	var wg = sync.WaitGroup{}
@@ -76,11 +81,28 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		responseMap = results
 	}
 
+	blacklist := <-blacklistChannel
+
 	// preserve results order
 	for i := 0; i < len(suggester.Suggesters); i++ {
-		aggregateResp.Suggestions = append(aggregateResp.Suggestions, responseMap[i]...)
+		for _, suggestion := range responseMap[i] {
+			if suggester.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
+				log.WithTransactionID(tid).Info("Suppressing suggestion for concept ", suggestion.ID)
+			} else {
+				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
+			}
+		}
 	}
 	return aggregateResp, nil
+}
+
+func fetchBlacklist(b ConceptBlacklister, c chan Blacklist, tid string) {
+	blacklist, err := b.GetBlacklist(tid)
+	if err != nil {
+		log.WithTransactionID(tid).WithError(err).Errorf("Error retrieving concept blacklist, filtering disabled")
+	}
+	c <- blacklist
+	close(c)
 }
 
 func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {

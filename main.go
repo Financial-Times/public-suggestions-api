@@ -124,7 +124,7 @@ func main() {
 	})
 	defaultSourceLocation := app.String(cli.StringOpt{
 		Name:   "default-source-location",
-		Value:  service.TmeSource,
+		Value:  service.CesSource,
 		Desc:   "The default source for locations suggestions",
 		EnvVar: "DEFAULT_SOURCE_LOCATION",
 	})

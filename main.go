@@ -112,13 +112,13 @@ func main() {
 
 	defaultSourcePerson := app.String(cli.StringOpt{
 		Name:   "default-source-person",
-		Value:  service.TmeSource,
+		Value:  service.CesSource,
 		Desc:   "The default source for person suggestions",
 		EnvVar: "DEFAULT_SOURCE_PERSON",
 	})
 	defaultSourceOrganisation := app.String(cli.StringOpt{
 		Name:   "default-source-organisation",
-		Value:  service.TmeSource,
+		Value:  service.CesSource,
 		Desc:   "The default source for organisations suggestions",
 		EnvVar: "DEFAULT_SOURCE_ORGANISATION",
 	})
@@ -130,7 +130,7 @@ func main() {
 	})
 	defaultSourceTopic := app.String(cli.StringOpt{
 		Name:   "default-source-topic",
-		Value:  service.TmeSource,
+		Value:  service.CesSource,
 		Desc:   "The default source for topics suggestions",
 		EnvVar: "DEFAULT_SOURCE_TOPIC",
 	})

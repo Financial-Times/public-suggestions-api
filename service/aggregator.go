@@ -10,24 +10,22 @@ import (
 const idsParamName = "ids"
 
 type AggregateSuggester struct {
-	DefaultSource   map[string]string
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider
 	Blacklister     ConceptBlacklister
 	Suggesters      []Suggester
 }
 
-func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, blacklister ConceptBlacklister, defaultTypesSources map[string]string, suggesters ...Suggester) *AggregateSuggester {
+func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, blacklister ConceptBlacklister, suggesters ...Suggester) *AggregateSuggester {
 	return &AggregateSuggester{
 		Concordance:     concordance,
-		DefaultSource:   defaultTypesSources,
 		Suggesters:      suggesters,
 		BroaderProvider: broaderConceptsProvider,
 		Blacklister:     blacklister,
 	}
 }
 
-func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
 	data, err := getXmlSuggestionRequestFromJson(payload)
 	if flags.Debug != "" {
 		log.WithTransactionID(tid).WithField("debug", flags.Debug).Info(string(data))
@@ -70,7 +68,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 
 	for key, suggesterDelegate := range suggester.Suggesters {
 		if len(responseMap[key]) > 0 {
-			responseMap[key] = suggesterDelegate.FilterSuggestions(responseMap[key], flags)
+			responseMap[key] = suggesterDelegate.FilterSuggestions(responseMap[key])
 		}
 	}
 

@@ -37,65 +37,6 @@ const sampleJSONResponse = `{
     ]
 }`
 
-const sampleFalconResponse = `{
-	"suggestions":[
-	  {
-		"predicate":"http://www.ft.com/ontology/annotation/hasAuthor",
-		"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc494",
-		"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc494",
-		"prefLabel":"Adam Samson",
-		"type":"http://www.ft.com/ontology/person/Person"
-	  },
-	  {
-		"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-		"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-		"prefLabel":"London",
-		"type":"http://www.ft.com/ontology/Location"
-	  },
-	  {
-		"id":"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-		"apiUrl":"http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a30",
-		"prefLabel":"Eric Platt",
-		"type":"http://www.ft.com/ontology/person/Person"
-	  },
-	  {
-		"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-		"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-		"prefLabel":"Apple",
-		"type":"http://www.ft.com/ontology/organisation/Organisation"
-	  },
-	  {
-		"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-		"apiUrl":"http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-		"prefLabel":"London Politics",
-		"type":"http://www.ft.com/ontology/Topic"
-	  }
-	]
-  }`
-
-const sampleOntotextResponse = `{
-	"suggestions":[
-	  {
-		"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-		"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-		"prefLabel":"London",
-		"type":"http://www.ft.com/ontology/Location"
-	  },
-	  {
-		"id":"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
-		"apiUrl":"http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385",
-		"prefLabel":"Eric Platt",
-		"type":"http://www.ft.com/ontology/person/Person"
-	  },
-	  {
-		"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
-		"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
-		"prefLabel":"Apple",
-		"type":"http://www.ft.com/ontology/organisation/Organisation"
-	  }
-	]
-  }`
-
 type mockHttpClient struct {
 	mock.Mock
 }
@@ -108,12 +49,12 @@ type mockSuggestionApi struct {
 	mock.Mock
 }
 
-func (m *mockSuggestionApi) FilterSuggestions(suggestions []Suggestion, flags SourceFlags) []Suggestion {
-	args := m.Called(suggestions, flags)
+func (m *mockSuggestionApi) FilterSuggestions(suggestions []Suggestion) []Suggestion {
+	args := m.Called(suggestions)
 	return args.Get(0).([]Suggestion)
 }
 
-func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
 	args := m.Called(payload, tid)
 	return args.Get(0).(SuggestionsResponse), args.Error(1)
 }
@@ -152,7 +93,7 @@ func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server
 		respStatus, respBody := m.UploadRequest(body, tid, contentTypeHeader, acceptHeader)
 		w.WriteHeader(respStatus)
 		if respBody != nil {
-			w.Write(respBody.([]byte))
+			_, _ = w.Write(respBody.([]byte))
 		}
 	}).Methods(http.MethodPost)
 
@@ -193,7 +134,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestFalconSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) {
+func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) {
 	expect := assert.New(t)
 
 	expectedSuggestions := []Suggestion{
@@ -225,10 +166,9 @@ func TestFalconSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) 
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: defaultConceptsSources})
-	suggestionResp.Suggestions = suggester.FilterSuggestions(suggestionResp.Suggestions, SourceFlags{Flags: defaultConceptsSources})
+	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", Flags{})
+	suggestionResp.Suggestions = suggester.FilterSuggestions(suggestionResp.Suggestions)
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -237,147 +177,6 @@ func TestFalconSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) 
 
 	expect.Contains(actualSuggestions, expectedSuggestions[0])
 	mock.AssertExpectationsForObjects(t, mockServer)
-}
-
-func TestFalconSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
-	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
-	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusServiceUnavailable, nil)
-	server := mockServer.startMockServer(t)
-
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
-
-	expect.Error(err)
-	expect.Equal("Falcon Suggestion API returned HTTP 503", err.Error())
-	expect.Nil(suggestionResp.Suggestions)
-
-	mock.AssertExpectationsForObjects(t, mockServer)
-}
-
-func TestFalconSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
-	expect := assert.New(t)
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester(":/", "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
-
-	expect.Nil(suggestionResp.Suggestions)
-	expect.Error(err)
-	expect.Equal("parse ://content/suggest: missing protocol scheme", err.Error())
-}
-
-func TestFalconSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
-	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
-
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
-
-	expect.Nil(suggestionResp.Suggestions)
-	expect.Error(err)
-	expect.Equal("Http Client err", err.Error())
-	mockClient.AssertExpectations(t)
-}
-
-func TestFalconSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
-	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
-	mockBody := new(mockResponseBody)
-
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: mockBody}, nil)
-	mockBody.On("Read", mock.AnythingOfType("[]uint8")).Return(0, errors.New("Read error"))
-	mockBody.On("Close").Return(nil)
-
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
-
-	expect.Nil(suggestionResp.Suggestions)
-	expect.Error(err)
-	expect.Equal("Read error", err.Error())
-	mockClient.AssertExpectations(t)
-	mockBody.AssertExpectations(t)
-}
-
-func TestFalconSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
-	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
-	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte{})
-	server := mockServer.startMockServer(t)
-
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: defaultConceptsSources})
-
-	expect.Error(err)
-	expect.Equal("unexpected end of JSON input", err.Error())
-	expect.Nil(suggestionResp.Suggestions)
-
-	mock.AssertExpectationsForObjects(t, mockServer)
-}
-
-func TestFalconSuggester_CheckHealth(t *testing.T) {
-	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
-	mockServer.On("GTG").Return(200)
-	server := mockServer.startMockServer(t)
-
-	suggester := NewFalconSuggester(server.URL, "/__gtg", http.DefaultClient)
-	check := suggester.Check()
-	checkResult, err := check.Checker()
-
-	expect.Equal("falcon-suggestion-api", check.ID)
-	expect.Equal("Suggestions from TME won't work", check.BusinessImpact)
-	expect.Equal("Falcon Suggestion API Healthcheck", check.Name)
-	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
-	expect.Equal("Falcon Suggestion API is not available", check.TechnicalSummary)
-	expect.Equal(uint8(2), check.Severity)
-	expect.NoError(err)
-	expect.Equal("Falcon Suggestion API is healthy", checkResult)
-	mock.AssertExpectationsForObjects(t, mockServer)
-}
-
-func TestFalconSuggester_CheckHealthUnhealthy(t *testing.T) {
-	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
-	mockServer.On("GTG").Return(503)
-	server := mockServer.startMockServer(t)
-
-	suggester := NewFalconSuggester(server.URL, "/__gtg", http.DefaultClient)
-	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	expect.Empty(checkResult)
-	assert.Equal(t, "Health check returned a non-200 HTTP status: 503", err.Error())
-	mock.AssertExpectationsForObjects(t, mockServer)
-}
-
-func TestFalconSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
-	expect := assert.New(t)
-
-	suggester := NewFalconSuggester(":/", "/__gtg", http.DefaultClient)
-	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
-	expect.Empty(checkResult)
-}
-
-func TestFalconSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
-	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
-
-	suggester := NewFalconSuggester("http://test-url", "/__gtg", mockClient)
-	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	assert.Equal(t, "Http Client err", err.Error())
-	expect.Empty(checkResult)
-	mockClient.AssertExpectations(t)
 }
 
 func TestAuthorsSuggester_CheckHealth(t *testing.T) {
@@ -441,6 +240,81 @@ func TestAuthorsSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestOntotextSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusServiceUnavailable, nil)
+	server := mockServer.startMockServer(t)
+
+	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
+
+	expect.Error(err)
+	expect.Equal("Ontotext Suggestion API returned HTTP 503", err.Error())
+	expect.Nil(suggestionResp.Suggestions)
+
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestOntotextSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
+	expect := assert.New(t)
+	suggester := NewOntotextSuggester(":/", "/content/suggest", http.DefaultClient)
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
+
+	expect.Nil(suggestionResp.Suggestions)
+	expect.Error(err)
+	expect.Equal("parse ://content/suggest: missing protocol scheme", err.Error())
+}
+
+func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
+	expect := assert.New(t)
+	mockClient := new(mockHttpClient)
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
+
+	suggester := NewOntotextSuggester("http://test-url", "/content/suggest", mockClient)
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
+
+	expect.Nil(suggestionResp.Suggestions)
+	expect.Error(err)
+	expect.Equal("Http Client err", err.Error())
+	mockClient.AssertExpectations(t)
+}
+
+func TestOntotextSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
+	expect := assert.New(t)
+	mockClient := new(mockHttpClient)
+	mockBody := new(mockResponseBody)
+
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: mockBody}, nil)
+	mockBody.On("Read", mock.AnythingOfType("[]uint8")).Return(0, errors.New("Read error"))
+	mockBody.On("Close").Return(nil)
+
+	suggester := NewOntotextSuggester("http://test-url", "/content/suggest", mockClient)
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
+
+	expect.Nil(suggestionResp.Suggestions)
+	expect.Error(err)
+	expect.Equal("Read error", err.Error())
+	mockClient.AssertExpectations(t)
+	mockBody.AssertExpectations(t)
+}
+
+func TestOntotextSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
+	expect := assert.New(t)
+	mockServer := new(mockSuggestionApiServer)
+	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte{})
+	server := mockServer.startMockServer(t)
+
+	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
+
+	expect.Error(err)
+	expect.Equal("unexpected end of JSON input", err.Error())
+	expect.Nil(suggestionResp.Suggestions)
+
+	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
 func TestOntotextSuggester_CheckHealth(t *testing.T) {
 	expect := assert.New(t)
 	mockServer := new(mockSuggestionApiServer)
@@ -502,15 +376,6 @@ func TestOntotextSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestGetSuggestions_NoResultsForAuthorsTmeSourceFlag(t *testing.T) {
-	expect := assert.New(t)
-	suggester := AuthorsSuggester{}
-	defaultConceptsSources := buildDefaultConceptSources()
-	response, _ := suggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
-
-	expect.Equal(response.Suggestions, []Suggestion{})
-}
-
 func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
@@ -543,9 +408,8 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	suggester := NewAuthorsSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", Flags{})
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -565,43 +429,11 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, fmt.Errorf("Error from ontotext-suggestion-api"))
 
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
-	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: map[string]string{
-		LocationSourceParam:     CesSource,
-		OrganisationSourceParam: TmeSource,
-	}})
+	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
 
 	expect.Error(err)
 	expect.Equal("Error from ontotext-suggestion-api", err.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)
-}
-
-func TestHasFlag(t *testing.T) {
-	expect := assert.New(t)
-
-	firstSuggesterTargetedTypes := []string{PersonSourceParam, OrganisationSourceParam}
-	secondSuggesterTargetedTypes := []string{LocationSourceParam}
-	sourceFlags := SourceFlags{
-		Flags: map[string]string{
-			LocationSourceParam:     CesSource,
-			OrganisationSourceParam: CesSource,
-			PersonSourceParam:       CesSource,
-		},
-	}
-	expect.True(sourceFlags.hasFlag(CesSource, firstSuggesterTargetedTypes))
-	expect.True(sourceFlags.hasFlag(CesSource, secondSuggesterTargetedTypes))
-
-	sourceFlags.Flags[LocationSourceParam] = TmeSource
-	expect.True(sourceFlags.hasFlag(CesSource, firstSuggesterTargetedTypes))
-	expect.False(sourceFlags.hasFlag(CesSource, secondSuggesterTargetedTypes))
-}
-
-func buildDefaultConceptSources() map[string]string {
-	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range TypeSourceParams {
-		defaultConceptsSource[conceptType] = TmeSource
-	}
-	defaultConceptsSource[PseudoConceptTypeAuthor] = AuthorsSource
-	return defaultConceptsSource
 }

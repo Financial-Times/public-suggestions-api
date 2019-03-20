@@ -1,26 +1,23 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
-
-	log "github.com/Financial-Times/go-logger"
-	"github.com/jawher/mow.cli"
-
-	"github.com/Financial-Times/http-handlers-go/httphandlers"
-	"github.com/gorilla/mux"
-	"github.com/rcrowley/go-metrics"
-
-	"net"
 	"time"
 
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
+	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/http-handlers-go/httphandlers"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
+	"github.com/gorilla/mux"
+	"github.com/jawher/mow.cli"
+	"github.com/rcrowley/go-metrics"
 )
 
 const appDescription = "Service serving requests made towards suggestions umbrella"
@@ -46,18 +43,6 @@ func main() {
 		Value:  "8080",
 		Desc:   "Port to listen on",
 		EnvVar: "APP_PORT",
-	})
-	falconSuggestionApiBaseURL := app.String(cli.StringOpt{
-		Name:   "falcon-suggestion-api-base-url",
-		Value:  "http://falcon-suggestion-api:8080",
-		Desc:   "The base URL to falcon suggestion api",
-		EnvVar: "FALCON_SUGGESTION_API_BASE_URL",
-	})
-	falconSuggestionEndpoint := app.String(cli.StringOpt{
-		Name:   "falcon-suggestion-endpoint",
-		Value:  "/content/suggest/falcon",
-		Desc:   "The endpoint for falcon suggestion api",
-		EnvVar: "FALCON_SUGGESTION_ENDPOINT",
 	})
 	authorsSuggestionApiBaseURL := app.String(cli.StringOpt{
 		Name:   "authors-suggestion-api-base-url",
@@ -110,31 +95,6 @@ func main() {
 		EnvVar: "PUBLIC_THINGS_ENDPOINT",
 	})
 
-	defaultSourcePerson := app.String(cli.StringOpt{
-		Name:   "default-source-person",
-		Value:  service.CesSource,
-		Desc:   "The default source for person suggestions",
-		EnvVar: "DEFAULT_SOURCE_PERSON",
-	})
-	defaultSourceOrganisation := app.String(cli.StringOpt{
-		Name:   "default-source-organisation",
-		Value:  service.CesSource,
-		Desc:   "The default source for organisations suggestions",
-		EnvVar: "DEFAULT_SOURCE_ORGANISATION",
-	})
-	defaultSourceLocation := app.String(cli.StringOpt{
-		Name:   "default-source-location",
-		Value:  service.CesSource,
-		Desc:   "The default source for locations suggestions",
-		EnvVar: "DEFAULT_SOURCE_LOCATION",
-	})
-	defaultSourceTopic := app.String(cli.StringOpt{
-		Name:   "default-source-topic",
-		Value:  service.CesSource,
-		Desc:   "The default source for topics suggestions",
-		EnvVar: "DEFAULT_SOURCE_TOPIC",
-	})
-
 	conceptBlacklisterBaseUrl := app.String(cli.StringOpt{
 		Name:   "concept-blacklister-base-url",
 		Value:  "http://concept-suggestions-blacklister:8080",
@@ -156,32 +116,24 @@ func main() {
 
 		tr := &http.Transport{
 			MaxIdleConnsPerHost: 128,
-			Dial: (&net.Dialer{
+			DialContext: (&net.Dialer{
 				Timeout:   10 * time.Second,
 				KeepAlive: 30 * time.Second,
-			}).Dial,
+			}).DialContext,
 		}
 		c := &http.Client{
 			Transport: tr,
 			Timeout:   10 * time.Second,
 		}
 
-		defaultSources := map[string]string{
-			service.PersonSourceParam:       *defaultSourcePerson,
-			service.LocationSourceParam:     *defaultSourceLocation,
-			service.OrganisationSourceParam: *defaultSourceOrganisation,
-			service.TopicSourceParam:        *defaultSourceTopic,
-			service.PseudoConceptTypeAuthor: service.AuthorsSource,
-		}
-		falconSuggester := service.NewFalconSuggester(*falconSuggestionApiBaseURL, *falconSuggestionEndpoint, c)
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
 		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
 		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
 		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, defaultSources, falconSuggester, authorsSuggester, ontotextSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
+		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
+		healthService := NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
 

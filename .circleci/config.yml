@@ -62,7 +62,7 @@ jobs:
       - image: bankrs/golang-dredd:go1.8.3-dredd4.4.0
         environment:
           GOPATH: /go
-          FALCON_SUGGESTION_API_BASE_URL: http://localhost:9000
+          CONCEPT_BLACKLISTER_BASE_URL: http://localhost:9000
           AUTHORS_SUGGESTION_API_BASE_URL: http://localhost:9000
           ONTOTEXT_SUGGESTION_API_BASE_URL: http://localhost:9000
           CONCEPT_CONCORDANCES_API_BASE_URL: http://localhost:9000

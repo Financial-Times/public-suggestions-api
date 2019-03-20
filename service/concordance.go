@@ -3,9 +3,10 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Financial-Times/go-fthealth/v1_1"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/Financial-Times/go-fthealth/v1_1"
 )
 
 type ConcordanceService struct {
@@ -103,8 +104,5 @@ func (concordance *ConcordanceService) getConcordances(ids []string, tid string,
 	}
 
 	err = json.Unmarshal(body, &concorded)
-	if err != nil {
-		return concorded, err
-	}
-	return concorded, nil
+	return concorded, err
 }

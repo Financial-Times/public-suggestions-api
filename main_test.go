@@ -3,15 +3,14 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
-
-	"net"
-	"net/http/httptest"
-	"strings"
 
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
@@ -63,7 +62,7 @@ func TestMainApp(t *testing.T) {
 		waitCh <- struct{}{}
 	}()
 	select {
-	case _ = <-waitCh:
+	case <-waitCh:
 		expect.FailNow("Main should be running")
 	case <-time.After(3 * time.Second):
 		for _, testCase := range testCases {
@@ -76,33 +75,6 @@ func TestMainApp(t *testing.T) {
 }
 
 func TestRequestHandler_all(t *testing.T) {
-	expectedFalconSuggestions := []service.Suggestion{
-		{
-			Concept: service.Concept{
-				ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				PrefLabel: "London Politics",
-				Type:      "http://www.ft.com/ontology/Topic",
-			},
-		},
-		{
-			Concept: service.Concept{
-				ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-				APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-				PrefLabel: "London",
-				Type:      "http://www.ft.com/ontology/Location",
-			},
-		},
-		{
-			Concept: service.Concept{
-				ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-				APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-				PrefLabel: "Apple",
-				Type:      "http://www.ft.com/ontology/organisation/Organisation",
-			},
-		},
-	}
-
 	expectedAuthorsSuggestions := []service.Suggestion{
 		{
 			Predicate: "http://www.ft.com/ontology/annotation/hasAuthor",
@@ -117,6 +89,14 @@ func TestRequestHandler_all(t *testing.T) {
 	}
 
 	expectedOntotextSuggestions := []service.Suggestion{
+		{
+			Concept: service.Concept{
+				ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+				PrefLabel: "London Politics",
+				Type:      "http://www.ft.com/ontology/Topic",
+			},
+		},
 		{
 			Concept: service.Concept{
 				ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
@@ -153,79 +133,11 @@ func TestRequestHandler_all(t *testing.T) {
 			url:            "http://localhost:8081/content/suggest",
 			expectedStatus: http.StatusOK,
 			expectedSuggestions: []service.Suggestion{
-				expectedFalconSuggestions[0],
-				expectedFalconSuggestions[2],
-				expectedAuthorsSuggestions[0],
-				expectedFalconSuggestions[1],
-			},
-		},
-		{
-			testName:       "OkWithTmePersonFlag",
-			url:            "http://localhost:8081/content/suggest?personSource=tme",
-			expectedStatus: http.StatusOK,
-			expectedSuggestions: []service.Suggestion{
-				expectedFalconSuggestions[0],
-				expectedFalconSuggestions[2],
-				expectedAuthorsSuggestions[0],
-				expectedFalconSuggestions[1],
-			},
-		},
-		{
-			testName:       "OkWithTmePersonAndLocationFlag",
-			url:            "http://localhost:8081/content/suggest?personSource=tme&locationSource=tme",
-			expectedStatus: http.StatusOK,
-			expectedSuggestions: []service.Suggestion{
-				expectedFalconSuggestions[0],
-				expectedFalconSuggestions[2],
-				expectedAuthorsSuggestions[0],
-				expectedFalconSuggestions[1],
-			},
-		},
-		{
-			testName:       "OkWithAllTmeFlags",
-			url:            "http://localhost:8081/content/suggest?personSource=tme&locationSource=tme&organisationSource=tme",
-			expectedStatus: http.StatusOK,
-			expectedSuggestions: []service.Suggestion{
-				expectedFalconSuggestions[0],
-				expectedFalconSuggestions[2],
-				expectedAuthorsSuggestions[0],
-				expectedFalconSuggestions[1],
-			},
-		},
-		{
-			testName:       "OkWithCesPersonFlag",
-			url:            "http://localhost:8081/content/suggest?personSource=ces",
-			expectedStatus: http.StatusOK,
-			expectedSuggestions: []service.Suggestion{
-				expectedOntotextSuggestions[1],
-				expectedFalconSuggestions[0],
-				expectedFalconSuggestions[2],
-				expectedAuthorsSuggestions[0],
-				expectedFalconSuggestions[1],
-			},
-		},
-		{
-			testName:       "OkWithCesPersonAndLocationFlag",
-			url:            "http://localhost:8081/content/suggest?personSource=ces&locationSource=ces",
-			expectedStatus: http.StatusOK,
-			expectedSuggestions: []service.Suggestion{
-				expectedOntotextSuggestions[1],
-				expectedFalconSuggestions[0],
-				expectedFalconSuggestions[2],
-				expectedAuthorsSuggestions[0],
-				expectedOntotextSuggestions[0],
-			},
-		},
-		{
-			testName:       "OkWithAllCesFlags",
-			url:            "http://localhost:8081/content/suggest?personSource=ces&locationSource=ces&organisationSource=ces",
-			expectedStatus: http.StatusOK,
-			expectedSuggestions: []service.Suggestion{
-				expectedOntotextSuggestions[1],
-				expectedFalconSuggestions[0],
 				expectedOntotextSuggestions[2],
-				expectedAuthorsSuggestions[0],
 				expectedOntotextSuggestions[0],
+				expectedOntotextSuggestions[3],
+				expectedAuthorsSuggestions[0],
+				expectedOntotextSuggestions[1],
 			},
 		},
 	}
@@ -234,40 +146,8 @@ func TestRequestHandler_all(t *testing.T) {
 		status := http.StatusOK
 		w.WriteHeader(status)
 		switch {
-		case strings.Contains(r.RequestURI, "/falcon"):
-			w.Write([]byte(`{  
-				"suggestions":[
-				  {
-					"predicate":"http://www.ft.com/ontology/annotation/hasAuthor",
-					"id":"http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b0",
-					"apiUrl":"http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b0",
-					"prefLabel":"Lawrence Summers",
-					"type":"http://www.ft.com/ontology/person/Person",
-					"isFTAuthor":true
-				  },
-				  {
-					"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					"apiUrl":"http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					"prefLabel":"London Politics",
-					"type":"http://www.ft.com/ontology/Topic"
-				  },
-				  {
-					"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					"prefLabel":"London",
-					"type":"http://www.ft.com/ontology/Location"
-				  },
-				  {
-					"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-					"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-					"prefLabel":"Apple",
-					"type":"http://www.ft.com/ontology/organisation/Organisation"
-				  }
-				]
-			  }`))
-
 		case strings.Contains(r.RequestURI, "/authors"):
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 				"suggestions":[
 				  {
 					"predicate":"http://www.ft.com/ontology/annotation/hasAuthor",
@@ -280,8 +160,14 @@ func TestRequestHandler_all(t *testing.T) {
 				]
 			  }`))
 		case strings.Contains(r.RequestURI, "/ontotext"):
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 				"suggestions":[
+				  {
+					"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					"apiUrl":"http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
+					"prefLabel":"London Politics",
+					"type":"http://www.ft.com/ontology/Topic"
+				  },
 				  {
 					"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
 					"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
@@ -303,7 +189,7 @@ func TestRequestHandler_all(t *testing.T) {
 				]
 			  }`))
 		case strings.Contains(r.RequestURI, "/internalconcordances"):
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 					"concepts": {
 						"6f14ea94-690f-3ed4-98c7-b926683c7355": {
 							"id": "http://www.ft.com/thing/6f14ea94-690f-3ed4-98c7-b926683c7355",
@@ -312,36 +198,17 @@ func TestRequestHandler_all(t *testing.T) {
 							"prefLabel": "Donald Kaberuka",
 							"isFTAuthor": false
 						},
-						"9a5e3b4a-55da-498c-816f-9c534e1392b0": {
-							"id":"http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b0",
-							"apiUrl":"http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b0",
-							"prefLabel":"Lawrence Summers",
-							"type":"http://www.ft.com/ontology/person/Person",
-							"isFTAuthor":true
-						},
 						"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
 							"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
 							"apiUrl":"http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
 							"prefLabel":"London Politics",
 							"type":"http://www.ft.com/ontology/Topic"
 						},
-						"f758ef56-c40a-3162-91aa-3e8a3aabc490": {
-							"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-							"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-							"prefLabel":"London",
-							"type":"http://www.ft.com/ontology/Location"
-						},
 						"f758ef56-c40a-3162-91aa-3e8a3aabc495": {
 							"id":"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
 							"apiUrl":"http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
 							"prefLabel":"London",
 							"type":"http://www.ft.com/ontology/Location"
-						},
-						"9332270e-f959-3f55-9153-d30acd0d0a50": {
-							"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-							"apiUrl":"http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-							"prefLabel":"Apple",
-							"type":"http://www.ft.com/ontology/organisation/Organisation"
 						},
 						"9332270e-f959-3f55-9153-d30acd0d0a55": {
 							"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
@@ -360,11 +227,11 @@ func TestRequestHandler_all(t *testing.T) {
 					}
 				}`))
 		case strings.Contains(r.RequestURI, "/things"):
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 					"things": {}
 				}`))
 		case strings.Contains(r.RequestURI, "/blacklist"):
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 					"uuids": []
 				}`))
 		}
@@ -372,26 +239,24 @@ func TestRequestHandler_all(t *testing.T) {
 
 	tr := &http.Transport{
 		MaxIdleConnsPerHost: 128,
-		Dial: (&net.Dialer{
+		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
-		}).Dial,
+		}).DialContext,
 	}
 	c := &http.Client{
 		Transport: tr,
 		Timeout:   30 * time.Second,
 	}
 
-	defaultConceptsSources := buildDefaultConceptSources()
-	falconSuggester := service.NewFalconSuggester(mockServer.URL, "/falcon", c)
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
 	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
 	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
 	blacklister := service.NewConceptBlacklister(mockServer.URL, "/blacklist", c)
 
-	suggester := service.NewAggregateSuggester(concordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, authorsSuggester, ontotextSuggester)
-	healthService := NewHealthService("mock", "mock", "", falconSuggester.Check(), authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
+	suggester := service.NewAggregateSuggester(concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
+	healthService := NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
@@ -407,11 +272,11 @@ func TestRequestHandler_all(t *testing.T) {
 		assert.Equalf(t, test.expectedStatus, res.StatusCode, "%s -> unexpected status code", test.testName)
 		if test.expectedStatus == http.StatusOK {
 			rBody := make([]byte, res.ContentLength)
-			res.Body.Read(rBody)
+			_, _ = res.Body.Read(rBody)
 			res.Body.Close()
 
 			suggestionsResponse := service.SuggestionsResponse{}
-			json.Unmarshal(rBody, &suggestionsResponse)
+			_ = json.Unmarshal(rBody, &suggestionsResponse)
 			suggestions := suggestionsResponse.Suggestions
 			sort.Slice(suggestions, func(i, j int) bool {
 				return suggestions[i].Concept.ID < suggestions[j].Concept.ID
@@ -420,13 +285,4 @@ func TestRequestHandler_all(t *testing.T) {
 		}
 	}
 
-}
-
-func buildDefaultConceptSources() map[string]string {
-	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range service.TypeSourceParams {
-		defaultConceptsSource[conceptType] = service.TmeSource
-	}
-	defaultConceptsSource[service.PseudoConceptTypeAuthor] = service.AuthorsSource
-	return defaultConceptsSource
 }

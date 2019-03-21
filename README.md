@@ -58,7 +58,7 @@ Options:
 
 ## Service endpoints
 
-If you want to view a more comprehensive list of the endpoints available for this service check out [api.yml](https://github.com/Financial-Times/public-suggestions-api/blob/feature/remove-falcon-suggestion-api/_ft/api.yml).
+If you want to view a more comprehensive list of the endpoints available for this service check out [api.yml](_ft/api.yml).
 
 ### POST
 * /content/suggest

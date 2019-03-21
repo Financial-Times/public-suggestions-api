@@ -24,9 +24,6 @@ const (
 	ontologyTopicType = "http://www.ft.com/ontology/Topic"
 
 	predicateHasAuthor = "http://www.ft.com/ontology/annotation/hasAuthor"
-
-	AuthorsSource = "authors"
-	CesSource     = "ces"
 )
 
 var (
@@ -39,7 +36,6 @@ var (
 	LocationSourceParam     = "locationSource"
 	OrganisationSourceParam = "organisationSource"
 	TopicSourceParam        = "topicSource"
-	TypeSourceParams        = []string{PersonSourceParam, OrganisationSourceParam, LocationSourceParam, TopicSourceParam, PseudoConceptTypeAuthor}
 
 	typeValidators = map[string]func(Suggestion) bool{
 		PersonSourceParam: func(value Suggestion) bool {
@@ -47,7 +43,6 @@ var (
 		},
 		LocationSourceParam: func(value Suggestion) bool {
 			return value.Type == ontologyLocationType
-
 		},
 		OrganisationSourceParam: func(value Suggestion) bool {
 			return value.Type == ontologyOrganisationType ||
@@ -57,7 +52,6 @@ var (
 		},
 		TopicSourceParam: func(value Suggestion) bool {
 			return value.Type == ontologyTopicType
-
 		},
 		PseudoConceptTypeAuthor: func(value Suggestion) bool {
 			return value.Type == ontologyPersonType && value.Predicate == predicateHasAuthor
@@ -83,7 +77,6 @@ type Suggester interface {
 
 type SuggestionApi struct {
 	name                 string
-	sourceName           string
 	targetedConceptTypes []string
 	apiBaseURL           string
 	suggestionEndpoint   string
@@ -127,7 +120,6 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 		suggestionEndpoint:   authorsSuggestionEndpoint,
 		client:               client,
 		name:                 "Authors Suggestion API",
-		sourceName:           AuthorsSource,
 		targetedConceptTypes: []string{PseudoConceptTypeAuthor},
 		systemId:             "authors-suggestion-api",
 		failureImpact:        "Suggesting authors from Concept Search won't work",
@@ -140,7 +132,6 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 		suggestionEndpoint:   ontotextSuggestionEndpoint,
 		client:               client,
 		name:                 "Ontotext Suggestion API",
-		sourceName:           CesSource,
 		targetedConceptTypes: []string{LocationSourceParam, OrganisationSourceParam, PersonSourceParam, TopicSourceParam},
 		systemId:             "ontotext-suggestion-api",
 		failureImpact:        "Suggesting locations, organisations and people from Ontotext won't work",
@@ -217,7 +208,7 @@ func (suggester *SuggestionApi) Check() health.Check {
 		ID:               suggester.systemId,
 		BusinessImpact:   suggester.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", suggester.name),
-		PanicGuide:       "https://dewey.in.ft.com/view/system/public-suggestions-api",
+		PanicGuide:       "https://biz-ops.in.ft.com/System/public-suggestions-api",
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", suggester.name),
 		Checker:          suggester.healthCheck,

@@ -87,6 +87,7 @@ func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server
 		tid := r.Header.Get("X-Request-Id")
 
 		body, err := ioutil.ReadAll(r.Body)
+		defer r.Body.Close()
 		assert.NoError(t, err)
 		assert.True(t, len(body) > 0)
 
@@ -99,6 +100,7 @@ func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server
 
 	router.HandleFunc("/__gtg", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(m.GTG())
+		r.Body.Close()
 	}).Methods(http.MethodGet)
 
 	return httptest.NewServer(router)
@@ -165,6 +167,7 @@ func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", Flags{})
@@ -184,6 +187,7 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(200)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewAuthorsSuggester(server.URL, "/__gtg", http.DefaultClient)
 	check := suggester.Check()
@@ -192,7 +196,7 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	expect.Equal("authors-suggestion-api", check.ID)
 	expect.Equal("Suggesting authors from Concept Search won't work", check.BusinessImpact)
 	expect.Equal("Authors Suggestion API Healthcheck", check.Name)
-	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
+	expect.Equal("https://biz-ops.in.ft.com/System/public-suggestions-api", check.PanicGuide)
 	expect.Equal("Authors Suggestion API is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)
@@ -205,6 +209,7 @@ func TestAuthorsSuggester_CheckHealthUnhealthy(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewAuthorsSuggester(server.URL, "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
@@ -245,6 +250,7 @@ func TestOntotextSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusServiceUnavailable, nil)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
@@ -304,6 +310,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) 
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte{})
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
@@ -320,6 +327,7 @@ func TestOntotextSuggester_CheckHealth(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(200)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/__gtg", http.DefaultClient)
 	check := suggester.Check()
@@ -328,7 +336,7 @@ func TestOntotextSuggester_CheckHealth(t *testing.T) {
 	expect.Equal("ontotext-suggestion-api", check.ID)
 	expect.Equal("Suggesting locations, organisations and people from Ontotext won't work", check.BusinessImpact)
 	expect.Equal("Ontotext Suggestion API Healthcheck", check.Name)
-	expect.Equal("https://dewey.in.ft.com/view/system/public-suggestions-api", check.PanicGuide)
+	expect.Equal("https://biz-ops.in.ft.com/System/public-suggestions-api", check.PanicGuide)
 	expect.Equal("Ontotext Suggestion API is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)
@@ -341,6 +349,7 @@ func TestOntotextSuggester_CheckHealthUnhealthy(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
@@ -407,6 +416,7 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewAuthorsSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", Flags{})

@@ -7,8 +7,6 @@ import (
 	log "github.com/Financial-Times/go-logger"
 )
 
-const idsParamName = "ids"
-
 type AggregateSuggester struct {
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider

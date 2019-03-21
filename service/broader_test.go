@@ -18,6 +18,7 @@ func TestBroaderConceptsProvider_CheckHealth(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(200).Once()
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewBroaderConceptsProvider(server.URL, "/__gtg", http.DefaultClient)
 	check := suggester.Check()
@@ -39,6 +40,7 @@ func TestBroaderConceptsProvider_CheckHealthUnhealthy(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewBroaderConceptsProvider(server.URL, "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()

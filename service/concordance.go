@@ -9,6 +9,8 @@ import (
 	"github.com/Financial-Times/go-fthealth/v1_1"
 )
 
+const idsParamName = "ids"
+
 type ConcordanceService struct {
 	systemId            string
 	name                string
@@ -38,7 +40,7 @@ func (concordance *ConcordanceService) Check() v1_1.Check {
 		ID:               concordance.systemId,
 		BusinessImpact:   concordance.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", concordance.name),
-		PanicGuide:       "https://dewey.in.ft.com/view/system/internal-concordances",
+		PanicGuide:       "https://biz-ops.in.ft.com/System/internal-concordances",
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", concordance.name),
 		Checker:          concordance.healthCheck,

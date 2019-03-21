@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  digest = "1:0e3c30694c9f3c284136c22a733cd119f6d7144a1e436eadfd1e5b9cdbeeefdf"
+  digest = "1:ac91e3632c89e46c4e757024bc4ffb9b7b33505ddfd95c44f7a367c73e86430f"
   name = "github.com/Financial-Times/go-fthealth"
   packages = ["v1_1"]
   pruneopts = "UT"
-  revision = "1b007e2b37b7936dfb6671fa17e5a29fd35a08ea"
-  version = "0.4.0"
+  revision = "ca83ad65381f2dac9c50f06e37fcd665a5300e15"
+  version = "0.6.1"
 
 [[projects]]
   digest = "1:ed7764f833c69827c95ecc7df89e6dd562b2663941f952f82c43dbac3d35c29e"
@@ -15,7 +15,7 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "febee6537e90971bab6f6fe60b71b4a0562dcab3"
-  version = "0.0.4"
+  version = "1.0.0"
 
 [[projects]]
   digest = "1:92da547d0414ad8a3f1a405503ee9b103cb87f5beabc52ef907f712f2ee1caf2"
@@ -54,20 +54,12 @@
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:c79fb010be38a59d657c48c6ba1d003a8aa651fa56b579d959d74573b7dff8e1"
-  name = "github.com/gorilla/context"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
-  version = "v1.1.1"
-
-[[projects]]
-  digest = "1:e73f5b0152105f18bc131fba127d9949305c8693f8a762588a82a48f61756f5f"
+  digest = "1:ca59b1175189b3f0e9f1793d2c350114be36eaabbe5b9f554b35edee1de50aea"
   name = "github.com/gorilla/mux"
   packages = ["."]
   pruneopts = "UT"
-  revision = "e3702bed27f0d39777b0b37b664b6280e8ef8fbf"
-  version = "v1.6.2"
+  revision = "a7962380ca08b5a188038c69871b8d3fbdf31e89"
+  version = "v1.7.0"
 
 [[projects]]
   digest = "1:77395dd3847dac9c45118c668f5dab85aedf0163dc3b38aea6578c5cf0d502f9"
@@ -78,7 +70,7 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:cd685a8b273acf671df4e26ec54c77c363d76eb80b554ed5374233a55f6e424f"
+  digest = "1:fc2797dcead598ee625a358f79a6ee5ff236ab9a108857e204f3f6075f38c49f"
   name = "github.com/jawher/mow.cli"
   packages = [
     ".",
@@ -91,8 +83,8 @@
     "internal/values",
   ]
   pruneopts = "UT"
-  revision = "2f22195f169da29d54624afd9eb83ada5c9e4ee9"
-  version = "v1.0.4"
+  revision = "d9c41c7c90d99b076732ee72a657577128d610da"
+  version = "v1.0.5"
 
 [[projects]]
   digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"

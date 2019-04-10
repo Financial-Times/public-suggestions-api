@@ -2,15 +2,13 @@ package web
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"errors"
-
-	"encoding/json"
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
@@ -61,13 +59,13 @@ func (r *faultyReader) Close() error {
 	return nil
 }
 
-func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags service.SourceFlags) (service.SuggestionsResponse, error) {
+func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags service.Flags) (service.SuggestionsResponse, error) {
 	args := s.Called(payload, tid, flags)
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
-func (s *mockSuggesterService) FilterSuggestions(suggestions []service.Suggestion, flags service.SourceFlags) []service.Suggestion {
-	args := s.Called(suggestions, flags)
+func (s *mockSuggesterService) FilterSuggestions(suggestions []service.Suggestion) []service.Suggestion {
+	args := s.Called(suggestions)
 	return args.Get(0).([]service.Suggestion)
 }
 
@@ -89,7 +87,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
-		service.Suggestion{
+		{
 			Concept: service.Concept{
 				IsFTAuthor: true,
 				ID:         "authors-suggestion-api",
@@ -100,7 +98,6 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		},
 	}}
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
 	mockPublicThings := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
@@ -124,9 +121,9 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{}, nil)
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -138,7 +135,6 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -147,79 +143,6 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 
 	expect.Equal(http.StatusOK, w.Code)
 	expect.Equal(`{"suggestions":[{"id":"authors-suggestion-api","apiUrl":"apiurl2","type":"http://www.ft.com/ontology/person/Person","prefLabel":"prefLabel2","isFTAuthor":true}]}`, w.Body.String())
-
-	mockSuggester.AssertExpectations(t)
-	mockPublicThings.AssertExpectations(t)
-	mockClient.AssertExpectations(t)
-}
-
-func TestRequestHandler_HandleSuggestionSuccessfullyWithPersonFlagTme(t *testing.T) {
-	expect := assert.New(t)
-
-	body := []byte(`{"byline":"Test byline","bodyXML":"Test body"}`)
-	req := httptest.NewRequest("POST", "/content/suggest?personSource=tme", bytes.NewReader(body))
-	req.Header.Add("X-Request-Id", "tid_test")
-	w := httptest.NewRecorder()
-
-	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
-		service.Suggestion{
-			Concept: service.Concept{
-				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
-				APIURL:     "apiurl1",
-				PrefLabel:  "prefLabel1",
-				Type:       personType,
-			},
-		},
-	}}
-
-	defaultConceptsSources := buildDefaultConceptSources()
-	mockClient := new(mockHttpClient)
-	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
-	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
-
-	mockInternalConcResp := service.ConcordanceResponse{
-		Concepts: make(map[string]service.Concept),
-	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = service.Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: personType,
-	}
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-
-	mockPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusOK}, nil)
-	broaderService := &service.BroaderConceptsProvider{
-		Client: mockPublicThings,
-	}
-
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(expectedResp, nil).Once()
-	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
-
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
-
-	handler.HandleSuggestion(w, req)
-
-	expect.Equal(http.StatusOK, w.Code)
-	expect.Equal(`{"suggestions":[{"id":"falcon-suggestion-api","apiUrl":"apiurl1","type":"http://www.ft.com/ontology/person/Person","prefLabel":"prefLabel1"}]}`, w.Body.String())
 
 	mockSuggester.AssertExpectations(t)
 	mockPublicThings.AssertExpectations(t)
@@ -241,7 +164,6 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
-	defaultConceptsSources := buildDefaultConceptSources()
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -253,7 +175,6 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -284,7 +205,6 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
-	defaultConceptsSources := buildDefaultConceptSources()
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -296,7 +216,6 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -327,7 +246,6 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
-	defaultConceptsSources := buildDefaultConceptSources()
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -339,7 +257,6 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -362,13 +279,12 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -384,7 +300,6 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -399,47 +314,6 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockClient.AssertExpectations(t)       //no calls
 }
 
-func TestRequestHandler_HandleSuggestionErrorInvalidLocationParamOnGetSuggestions(t *testing.T) {
-	expect := assert.New(t)
-	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
-	req := httptest.NewRequest("POST", "/content/suggest?locationSource=invalid", bytes.NewReader(body))
-	req.Header.Add("X-Request-Id", "tid_test")
-	w := httptest.NewRecorder()
-
-	mockClient := new(mockHttpClient)
-	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
-	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
-
-	broaderService := &service.BroaderConceptsProvider{
-		Client: mockPublicThings,
-	}
-	defaultConceptsSources := buildDefaultConceptSources()
-
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
-	handler.HandleSuggestion(w, req)
-
-	expect.Equal(http.StatusBadRequest, w.Code)
-	expect.Equal(`{"message": "source flag incorrectly set. Accepted values are: ces, tme"}`, w.Body.String())
-	mockSuggester.AssertExpectations(t)    //no calls
-	mockPublicThings.AssertExpectations(t) //no calls
-	mockClient.AssertExpectations(t)       //no calls
-}
-
 func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T) {
 	expect := assert.New(t)
 	body := []byte(`{"bodyXML":"Test body"}`)
@@ -447,14 +321,13 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	service.NoContentError = errors.New("No content error")
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{
 		Suggestions: make([]service.Suggestion, 0),
 	}, service.NoContentError)
 
@@ -472,7 +345,6 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -495,13 +367,12 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -517,7 +388,6 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -540,14 +410,13 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.SourceFlags{Flags: defaultConceptsSources}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
-		service.Suggestion{
+	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
+		{
 			Concept: service.Concept{
 				IsFTAuthor: true,
 				ID:         "authors-suggestion-api",
@@ -573,7 +442,6 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 
 	handler := NewRequestHandler(&service.AggregateSuggester{
 		Concordance:     mockConcordance,
-		DefaultSource:   defaultConceptsSources,
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
@@ -586,12 +454,4 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	mockSuggester.AssertExpectations(t)
 	mockPublicThings.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
-}
-
-func buildDefaultConceptSources() map[string]string {
-	defaultConceptsSource := map[string]string{}
-	for _, conceptType := range service.TypeSourceParams {
-		defaultConceptsSource[conceptType] = service.TmeSource
-	}
-	return defaultConceptsSource
 }

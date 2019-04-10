@@ -19,9 +19,9 @@ import (
 func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
-	// create falcon response mock
-	falconMock := new(mockHttpClient)
-	falconMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+	// create ontotext response mock
+	ontotextMock := new(mockHttpClient)
+	ontotextMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{
 				"suggestions":[
@@ -105,8 +105,7 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	mockClientError.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusInternalServerError}, nil)
 
 	// create all the services
-	defaultConceptsSources := buildDefaultConceptSources()
-	falconSuggester := NewFalconSuggester("falconUrl", "falconEndpoint", falconMock)
+	ontotextSuggester := NewOntotextSuggester("ontotextnUrl", "ontotextEndpoint", ontotextMock)
 	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientError)
@@ -119,9 +118,9 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, authorsSuggester)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, ontotextSuggester, authorsSuggester)
 
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
@@ -154,11 +153,11 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
-	defaultConceptsSources := buildDefaultConceptSources()
-	suggester := NewFalconSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", SourceFlags{Flags: defaultConceptsSources})
-	suggestionResp.Suggestions = suggester.FilterSuggestions(suggestionResp.Suggestions, SourceFlags{Flags: defaultConceptsSources})
+	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", Flags{})
+	suggestionResp.Suggestions = suggester.FilterSuggestions(suggestionResp.Suggestions)
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -171,559 +170,16 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	mock.AssertExpectationsForObjects(t, mockServer)
 }
 
-func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFilteredCesVSTme(t *testing.T) {
-	expect := assert.New(t)
-
-	defaultConceptsSources := buildDefaultConceptSources()
-
-	tests := []struct {
-		testName                     string
-		expectedUUIDs                []string
-		internalConcordancesConcepts map[string]Concept
-		flags                        map[string]string
-	}{
-		{
-			testName: "withoutFlags",
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"f758ef56-c40a-3162-91aa-3e8a3aabc490": {
-					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					PrefLabel: "London",
-					Type:      "http://www.ft.com/ontology/Location",
-				},
-				"64302452-e369-4ddb-88fa-9adc5124a380": {
-					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
-					PrefLabel: "Eric Platt",
-					Type:      "http://www.ft.com/ontology/person/Person",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a50": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-			flags: defaultConceptsSources,
-		},
-		{
-			testName: "allTmeFlags",
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"f758ef56-c40a-3162-91aa-3e8a3aabc490": {
-					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					PrefLabel: "London",
-					Type:      "http://www.ft.com/ontology/Location",
-				},
-				"64302452-e369-4ddb-88fa-9adc5124a380": {
-					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
-					PrefLabel: "Eric Platt",
-					Type:      "http://www.ft.com/ontology/person/Person",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a50": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-			flags: map[string]string{
-				PersonSourceParam:       TmeSource,
-				LocationSourceParam:     TmeSource,
-				OrganisationSourceParam: TmeSource,
-				TopicSourceParam:        TmeSource,
-				PseudoConceptTypeAuthor: TmeSource,
-			},
-		},
-		{
-			testName: "allCesFlags",
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
-				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
-				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"f758ef56-c40a-3162-91aa-3e8a3aabc495": {
-					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-					PrefLabel: "London",
-					Type:      "http://www.ft.com/ontology/Location",
-				},
-				"64302452-e369-4ddb-88fa-9adc5124a385": {
-					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
-					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385",
-					PrefLabel: "Eric Platt",
-					Type:      "http://www.ft.com/ontology/person/Person",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a55": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-			flags: map[string]string{
-				PersonSourceParam:       CesSource,
-				LocationSourceParam:     CesSource,
-				OrganisationSourceParam: CesSource,
-				TopicSourceParam:        TmeSource,
-				PseudoConceptTypeAuthor: TmeSource,
-			},
-		},
-		{
-			testName: "cesPeople",
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"f758ef56-c40a-3162-91aa-3e8a3aabc490": {
-					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					PrefLabel: "London",
-					Type:      "http://www.ft.com/ontology/Location",
-				},
-				"64302452-e369-4ddb-88fa-9adc5124a385": {
-					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a385",
-					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a385",
-					PrefLabel: "Eric Platt",
-					Type:      "http://www.ft.com/ontology/person/Person",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a50": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-			flags: map[string]string{
-				PersonSourceParam:       CesSource,
-				LocationSourceParam:     TmeSource,
-				OrganisationSourceParam: TmeSource,
-				TopicSourceParam:        TmeSource,
-				PseudoConceptTypeAuthor: TmeSource,
-			},
-		},
-		{
-			testName: "cesLocation",
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"f758ef56-c40a-3162-91aa-3e8a3aabc495": {
-					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc495",
-					PrefLabel: "London",
-					Type:      "http://www.ft.com/ontology/Location",
-				},
-				"64302452-e369-4ddb-88fa-9adc5124a380": {
-					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
-					PrefLabel: "Eric Platt",
-					Type:      "http://www.ft.com/ontology/person/Person",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a50": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-			flags: map[string]string{
-				PersonSourceParam:       TmeSource,
-				LocationSourceParam:     CesSource,
-				OrganisationSourceParam: TmeSource,
-				TopicSourceParam:        TmeSource,
-				PseudoConceptTypeAuthor: TmeSource,
-			},
-		},
-		{
-			testName: "cesOrganisation",
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				"http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"f758ef56-c40a-3162-91aa-3e8a3aabc490": {
-					ID:        "http://www.ft.com/thing/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					APIURL:    "http://api.ft.com/people/f758ef56-c40a-3162-91aa-3e8a3aabc490",
-					PrefLabel: "London",
-					Type:      "http://www.ft.com/ontology/Location",
-				},
-				"64302452-e369-4ddb-88fa-9adc5124a380": {
-					ID:        "http://www.ft.com/thing/64302452-e369-4ddb-88fa-9adc5124a380",
-					APIURL:    "http://api.ft.com/people/64302452-e369-4ddb-88fa-9adc5124a380",
-					PrefLabel: "Eric Platt",
-					Type:      "http://www.ft.com/ontology/person/Person",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a55": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a55",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a55",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-			flags: map[string]string{
-				PersonSourceParam:       TmeSource,
-				LocationSourceParam:     TmeSource,
-				OrganisationSourceParam: CesSource,
-				TopicSourceParam:        TmeSource,
-				PseudoConceptTypeAuthor: TmeSource,
-			},
-		},
-	}
-
-	for _, testCase := range tests {
-		falconHTTPMock := new(mockHttpClient)
-		falconHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       ioutil.NopCloser(strings.NewReader(sampleFalconResponse)),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		ontotextHTTPMock := new(mockHttpClient)
-		ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       ioutil.NopCloser(strings.NewReader(sampleOntotextResponse)),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		mockClient := new(mockHttpClient)
-
-		internalConcordancesResponse := ConcordanceResponse{
-			Concepts: testCase.internalConcordancesConcepts,
-		}
-		expectedBody, err := json.Marshal(internalConcordancesResponse)
-		expect.NoError(err)
-		buffer := &ClosingBuffer{
-			Buffer: bytes.NewBuffer(expectedBody),
-		}
-		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       buffer,
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		mockClientPublicThings := new(mockHttpClient)
-		mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       ioutil.NopCloser(strings.NewReader("")),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-
-		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
-		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
-		broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-
-		blacklisterMock := new(mockHttpClient)
-		blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body: ioutil.NopCloser(strings.NewReader(
-				`{"uuids":[]}`)),
-			StatusCode: http.StatusOK,
-		}, nil)
-		blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, ontotextSuggester)
-
-		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
-		expect.NoError(err)
-
-		actualSuggestions := suggestionResp.Suggestions
-		expect.NotNilf(actualSuggestions, "%s -> nil suggestions", testCase.testName)
-		expect.Lenf(actualSuggestions, len(testCase.expectedUUIDs), "%s -> unexpected number of suggestions", testCase.testName)
-
-		for _, expectedID := range testCase.expectedUUIDs {
-			found := false
-			for _, actualSugg := range actualSuggestions {
-				if expectedID == actualSugg.ID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				expect.Failf("expected suggestion not returned", "%s -> %s missing", testCase.testName, expectedID)
-			}
-		}
-	}
-}
-
-// This is about the other concept types that should be handled as organisations (PublicCompany, PrivateCompany, Company)
-func TestAggregateSuggester_GetSuggestionsAllOrganisationsTypes(t *testing.T) {
-	expect := assert.New(t)
-
-	falconSuggestions := `{  
-		"suggestions":[  
-		  {  
-			"id":"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-			"apiUrl":"http://api.ft.com/things/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-			"prefLabel":"London Politics",
-			"type":"http://www.ft.com/ontology/Topic"
-		  },
-		  {  
-			"id":"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-			"apiUrl":"http://api.ft.com/things/9332270e-f959-3f55-9153-d30acd0d0a50",
-			"prefLabel":"Apple",
-			"type":"http://www.ft.com/ontology/organisation/Organisation"
-		  },
-		  {  
-			"id":"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
-			"apiUrl":"http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
-			"prefLabel":"Facebook",
-			"type":"http://www.ft.com/ontology/company/PrivateCompany"
-		  },
-		  {  
-			"id":"http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
-			"apiUrl":"http://api.ft.com/things/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
-			"prefLabel":"CIA",
-			"type":"http://www.ft.com/ontology/company/PublicCompany"
-		  },
-		  {  
-			"id":"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
-			"apiUrl":"http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
-			"prefLabel":"ABC",
-			"type":"http://www.ft.com/ontology/company/Company"
-		  }
-		]
-	  }`
-	ontotextSuggestions := `{  
-		"suggestions":[
-		  {  
-			"id":"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
-			"apiUrl":"http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
-			"prefLabel":"CIA",
-			"type":"http://www.ft.com/ontology/company/PublicCompany"
-		  },
-		  {  
-			"id":"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
-			"apiUrl":"http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
-			"prefLabel":"ABC",
-			"type":"http://www.ft.com/ontology/company/Company"
-		  }
-		]
-	  }`
-	defaultConceptsSources := buildDefaultConceptSources()
-
-	tests := []struct {
-		testName                     string
-		expectedUUIDs                []string
-		flags                        map[string]string
-		internalConcordancesConcepts map[string]Concept
-	}{
-		{
-			testName: "withoutFlags",
-			flags:    defaultConceptsSources,
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				"http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
-				"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
-				"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"70121ea5-caf8-11e8-b0db-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3990",
-					PrefLabel: "ABC",
-					Type:      "http://www.ft.com/ontology/company/Company",
-				},
-				"ec0307f0-caf7-11e8-a9b5-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3990",
-					PrefLabel: "Facebook",
-					Type:      "http://www.ft.com/ontology/company/PrivateCompany",
-				},
-				"0767212c-caf9-11e8-b2ed-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/things/0767212c-caf9-11e8-b2ed-6c96cfdf3990",
-					PrefLabel: "CIA",
-					Type:      "http://www.ft.com/ontology/company/PublicCompany",
-				},
-				"9332270e-f959-3f55-9153-d30acd0d0a50": {
-					ID:        "http://www.ft.com/thing/9332270e-f959-3f55-9153-d30acd0d0a50",
-					APIURL:    "http://api.ft.com/people/9332270e-f959-3f55-9153-d30acd0d0a50",
-					PrefLabel: "Apple",
-					Type:      "http://www.ft.com/ontology/organisation/Organisation",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-		},
-		{
-			testName: "fromCesOrganisations",
-			flags: map[string]string{
-				LocationSourceParam:     TmeSource,
-				PersonSourceParam:       TmeSource,
-				OrganisationSourceParam: CesSource,
-				TopicSourceParam:        TmeSource,
-				PseudoConceptTypeAuthor: TmeSource,
-			},
-			expectedUUIDs: []string{
-				"http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-				"http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
-				"http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
-			},
-			internalConcordancesConcepts: map[string]Concept{
-				"70121ea5-caf8-11e8-b0db-6c96cfdf3995": {
-					ID:        "http://www.ft.com/thing/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
-					APIURL:    "http://api.ft.com/things/70121ea5-caf8-11e8-b0db-6c96cfdf3995",
-					PrefLabel: "ABC",
-					Type:      "http://www.ft.com/ontology/company/Company",
-				},
-				"ec0307f0-caf7-11e8-a9b5-6c96cfdf3995": {
-					ID:        "http://www.ft.com/thing/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
-					APIURL:    "http://api.ft.com/things/ec0307f0-caf7-11e8-a9b5-6c96cfdf3995",
-					PrefLabel: "Facebook",
-					Type:      "http://www.ft.com/ontology/company/PrivateCompany",
-				},
-				"7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990": {
-					ID:        "http://www.ft.com/thing/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					APIURL:    "http://api.ft.com/people/7e78cb61-c6f6-11e8-8ddc-6c96cfdf3990",
-					PrefLabel: "London Politics",
-					Type:      "http://www.ft.com/ontology/Topic",
-				},
-			},
-		},
-	}
-
-	for _, testCase := range tests {
-		falconHTTPMock := new(mockHttpClient)
-		falconHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       ioutil.NopCloser(strings.NewReader(falconSuggestions)),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		ontotextHTTPMock := new(mockHttpClient)
-		ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       ioutil.NopCloser(strings.NewReader(ontotextSuggestions)),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		mockClient := new(mockHttpClient)
-		internalConcordancesResponse := ConcordanceResponse{
-			Concepts: testCase.internalConcordancesConcepts,
-		}
-		expectedBody, err := json.Marshal(internalConcordancesResponse)
-		expect.NoError(err)
-		buffer := &ClosingBuffer{
-			Buffer: bytes.NewBuffer(expectedBody),
-		}
-		mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       buffer,
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		mockClientPublicThings := new(mockHttpClient)
-		mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body:       ioutil.NopCloser(strings.NewReader("")),
-			StatusCode: http.StatusOK,
-		}, nil)
-
-		mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-
-		falconSuggester := NewFalconSuggester("falconHost", "/content/suggest/falcon", falconHTTPMock)
-		ontotextSuggester := NewOntotextSuggester("ontotextHost", "/content/suggest/ontotext", ontotextHTTPMock)
-		broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-
-		blacklisterMock := new(mockHttpClient)
-		blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-			Body: ioutil.NopCloser(strings.NewReader(
-				`{"uuids":[]}`)),
-			StatusCode: http.StatusOK,
-		}, nil)
-		blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-		aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, falconSuggester, ontotextSuggester)
-
-		suggestionResp, err := aggregateSuggester.GetSuggestions([]byte("{}"), "tid_test", SourceFlags{Flags: testCase.flags})
-		expect.NoError(err)
-
-		actualSuggestions := suggestionResp.Suggestions
-		expect.NotNilf(actualSuggestions, "%s -> nil suggestions", testCase.testName)
-		expect.Lenf(actualSuggestions, len(testCase.expectedUUIDs), "%s -> unexpected number of suggestions", testCase.testName)
-
-		for _, expectedID := range testCase.expectedUUIDs {
-			found := false
-			for _, actualSugg := range actualSuggestions {
-				if expectedID == actualSugg.ID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				expect.Failf("expected suggestion not returned", "%s -> %s missing", testCase.testName, expectedID)
-			}
-		}
-	}
-}
 
 func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	expect := assert.New(t)
 	suggestionAPI := new(mockSuggestionApi)
-	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
 			Predicate: "predicate",
 			Concept: Concept{
 				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
+				ID:         "ontotext-suggestion-api",
 				APIURL:     "apiurl1",
 				PrefLabel:  "prefLabel1",
 				Type:       ontologyPersonType,
@@ -742,16 +198,14 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 			},
 		},
 	}}
-	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
 	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
-
-	defaultConceptsSources := buildDefaultConceptSources()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
 	}
 	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
@@ -777,8 +231,8 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionAPI, suggestionAPI)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.Error(err)
 	expect.Equal(err.Error(), "error during calling internal concordances")
@@ -790,12 +244,12 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	expect := assert.New(t)
 	suggestionAPI := new(mockSuggestionApi)
-	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
 			Predicate: "predicate",
 			Concept: Concept{
 				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
+				ID:         "ontotext-suggestion-api",
 				APIURL:     "apiurl1",
 				PrefLabel:  "prefLabel1",
 				Type:       ontologyPersonType,
@@ -814,16 +268,14 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 			},
 		},
 	}}
-	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil)
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil)
 	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil)
-
-	defaultConceptsSources := buildDefaultConceptSources()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
 	}
 	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
@@ -852,14 +304,14 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	}, nil).Once()
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionAPI, suggestionAPI)
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
 
 	// 503
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusServiceUnavailable,
 	}, nil).Once()
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 503", err.Error())
 	expect.Len(response.Suggestions, 0)
@@ -869,7 +321,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusBadRequest,
 	}, nil).Once()
-	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 400", err.Error())
 	expect.Len(response.Suggestions, 0)
@@ -884,12 +336,12 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
-	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
 			Predicate: "predicate",
 			Concept: Concept{
 				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
+				ID:         "ontotext-suggestion-api",
 				APIURL:     "apiurl1",
 				PrefLabel:  "prefLabel1",
 				Type:       ontologyPersonType},
@@ -909,16 +361,16 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	},
 	}
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
-	suggestionApi.On("FilterSuggestions", falconSuggestion.Suggestions, mock.Anything).Return(falconSuggestion.Suggestions).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
 	}
 	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
@@ -936,8 +388,6 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	defaultConceptsSources := buildDefaultConceptSources()
-
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
@@ -948,12 +398,12 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.Len(response.Suggestions, 2)
 
-	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
+	expect.Contains(response.Suggestions, ontotextSuggestion.Suggestions[0])
 	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
 	suggestionApi.AssertExpectations(t)
@@ -962,12 +412,12 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
-	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
 			Predicate: "predicate",
 			Concept: Concept{
 				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
+				ID:         "ontotext-suggestion-api",
 				APIURL:     "apiurl1",
 				PrefLabel:  "prefLabel1",
 				Type:       ontologyPersonType,
@@ -986,18 +436,16 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 			},
 		},
 	}}
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
-	suggestionApi.On("FilterSuggestions", falconSuggestion.Suggestions, mock.Anything).Return(falconSuggestion.Suggestions).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
-
-	defaultConceptsSources := buildDefaultConceptSources()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
 	}
 	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
@@ -1028,13 +476,13 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
 
-	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
+	expect.Contains(response.Suggestions, ontotextSuggestion.Suggestions[0])
 	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
 	suggestionApi.AssertExpectations(t)
@@ -1044,7 +492,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	mockConcordance := new(ConcordanceService)
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err"))
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Ontotext err"))
 
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -1052,7 +500,6 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
@@ -1063,8 +510,8 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 0)
@@ -1073,7 +520,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	suggestionApi.AssertExpectations(t)
 }
 
-func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testing.T) {
+func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *testing.T) {
 	expect := assert.New(t)
 
 	suggestionApi := new(mockSuggestionApi)
@@ -1092,7 +539,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Falcon err")).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Ontotext err")).Once()
 
 	suggestionsResponse := SuggestionsResponse{Suggestions: []Suggestion{
 		{
@@ -1116,7 +563,6 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	defaultConceptsSources := buildDefaultConceptSources()
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
@@ -1127,8 +573,8 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForFalconSuggestionApi(t *testi
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
@@ -1145,12 +591,12 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
-	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
 			Predicate: "predicate",
 			Concept: Concept{
 				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
+				ID:         "ontotext-suggestion-api",
 				APIURL:     "apiurl1",
 				PrefLabel:  "prefLabel1",
 				Type:       ontologyPersonType},
@@ -1170,16 +616,16 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 	},
 	}
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
-	suggestionApi.On("FilterSuggestions", falconSuggestion.Suggestions, mock.Anything).Return(falconSuggestion.Suggestions).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
 	}
 	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
@@ -1197,20 +643,18 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	defaultConceptsSources := buildDefaultConceptSources()
-
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":["falcon-suggestion-api"]}`)),
+			`{"uuids":["ontotext-suggestion-api"]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.Len(response.Suggestions, 1)
 
@@ -1226,12 +670,12 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	mockClient := new(mockHttpClient)
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
-	falconSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
+	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
 			Predicate: "predicate",
 			Concept: Concept{
 				IsFTAuthor: false,
-				ID:         "falcon-suggestion-api",
+				ID:         "ontotext-suggestion-api",
 				APIURL:     "apiurl1",
 				PrefLabel:  "prefLabel1",
 				Type:       ontologyPersonType},
@@ -1251,16 +695,16 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	},
 	}
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(falconSuggestion, nil).Once()
-	suggestionApi.On("FilterSuggestions", falconSuggestion.Suggestions, mock.Anything).Return(falconSuggestion.Suggestions).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
 	}
-	mockInternalConcResp.Concepts["falcon-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "falcon-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
+		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
 	}
 	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
 		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
@@ -1278,8 +722,6 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	defaultConceptsSources := buildDefaultConceptSources()
-
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
@@ -1290,12 +732,12 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	}, nil)
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, defaultConceptsSources, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", SourceFlags{Flags: defaultConceptsSources})
+	aggregateSuggester := NewAggregateSuggester(mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", Flags{})
 
 	expect.Len(response.Suggestions, 2)
 
-	expect.Contains(response.Suggestions, falconSuggestion.Suggestions[0])
+	expect.Contains(response.Suggestions, ontotextSuggestion.Suggestions[0])
 	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
 	suggestionApi.AssertExpectations(t)

@@ -13,6 +13,7 @@ func TestConcordanceService_CheckHealth(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(200).Once()
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewConcordance(server.URL, "/__gtg", http.DefaultClient)
 	check := suggester.Check()
@@ -21,7 +22,7 @@ func TestConcordanceService_CheckHealth(t *testing.T) {
 	expect.Equal("internal-concordances", check.ID)
 	expect.Equal("Suggestions won't work", check.BusinessImpact)
 	expect.Equal("internal-concordances Healthcheck", check.Name)
-	expect.Equal("https://dewey.in.ft.com/view/system/internal-concordances", check.PanicGuide)
+	expect.Equal("https://biz-ops.in.ft.com/System/internal-concordances", check.PanicGuide)
 	expect.Equal("internal-concordances is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)
@@ -34,6 +35,7 @@ func TestConcordanceService_CheckHealthUnhealthy(t *testing.T) {
 	mockServer := new(mockSuggestionApiServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
+	defer server.Close()
 
 	suggester := NewConcordance(server.URL, "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()

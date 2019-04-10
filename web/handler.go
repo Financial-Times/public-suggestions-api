@@ -2,18 +2,14 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
+	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	tidutils "github.com/Financial-Times/transactionid-utils-go"
-
-	"errors"
-
-	"fmt"
-
-	log "github.com/Financial-Times/go-logger"
-	"github.com/Financial-Times/public-suggestions-api/web/util"
 )
 
 type RequestHandler struct {
@@ -47,22 +43,14 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	defaultValues, err := prepareTypesSource(request, handler.Suggester.DefaultSource)
-	if err != nil {
-		errMsg := fmt.Sprintf("source flag incorrectly set. Accepted values are: %s, %s", service.CesSource, service.TmeSource)
-		log.WithTransactionID(tid).WithError(err).Error(errMsg)
-		writeResponse(writer, http.StatusBadRequest, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
-		return
-	}
-
-	suggestions, err := handler.Suggester.GetSuggestions(body, tid, service.SourceFlags{Flags: defaultValues, Debug: debug})
-
+	suggestions, err := handler.Suggester.GetSuggestions(body, tid, service.Flags{Debug: debug})
 	if err != nil {
 		errMsg := "aggregating suggestions failed!"
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)
 		writeResponse(writer, http.StatusServiceUnavailable, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
 		return
 	}
+
 	if len(suggestions.Suggestions) == 0 {
 		log.WithTransactionID(tid).Warn("Suggestions are empty")
 	}
@@ -87,25 +75,4 @@ func writeResponse(writer http.ResponseWriter, status int, response []byte) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(status)
 	writer.Write(response)
-}
-
-func prepareTypesSource(req *http.Request, defaultValues map[string]string) (map[string]string, error) {
-	result := make(map[string]string)
-	for conceptType, defaultValue := range defaultValues {
-		result[conceptType] = defaultValue
-
-		if conceptType == service.PseudoConceptTypeAuthor {
-			//no override for authors
-			continue
-		}
-		val, found, err := util.GetSingleValueQueryParameter(req, conceptType, service.TmeSource, service.CesSource)
-		if err != nil {
-			return result, err
-		}
-		if found {
-			result[conceptType] = val
-		}
-	}
-
-	return result, nil
 }

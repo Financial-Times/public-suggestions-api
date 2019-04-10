@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	health "github.com/Financial-Times/go-fthealth/v1_1"
-	log "github.com/Financial-Times/go-logger"
 	"io/ioutil"
 	"net/http"
+
+	health "github.com/Financial-Times/go-fthealth/v1_1"
+	log "github.com/Financial-Times/go-logger"
 )
 
 const (
@@ -23,10 +24,6 @@ const (
 	ontologyTopicType = "http://www.ft.com/ontology/Topic"
 
 	predicateHasAuthor = "http://www.ft.com/ontology/annotation/hasAuthor"
-
-	TmeSource     = "tme"
-	AuthorsSource = "authors"
-	CesSource     = "ces"
 )
 
 var (
@@ -39,7 +36,6 @@ var (
 	LocationSourceParam     = "locationSource"
 	OrganisationSourceParam = "organisationSource"
 	TopicSourceParam        = "topicSource"
-	TypeSourceParams        = []string{PersonSourceParam, OrganisationSourceParam, LocationSourceParam, TopicSourceParam, PseudoConceptTypeAuthor}
 
 	typeValidators = map[string]func(Suggestion) bool{
 		PersonSourceParam: func(value Suggestion) bool {
@@ -47,7 +43,6 @@ var (
 		},
 		LocationSourceParam: func(value Suggestion) bool {
 			return value.Type == ontologyLocationType
-
 		},
 		OrganisationSourceParam: func(value Suggestion) bool {
 			return value.Type == ontologyOrganisationType ||
@@ -57,7 +52,6 @@ var (
 		},
 		TopicSourceParam: func(value Suggestion) bool {
 			return value.Type == ontologyTopicType
-
 		},
 		PseudoConceptTypeAuthor: func(value Suggestion) bool {
 			return value.Type == ontologyPersonType && value.Predicate == predicateHasAuthor
@@ -76,24 +70,19 @@ type Client interface {
 }
 
 type Suggester interface {
-	GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error)
-	FilterSuggestions(suggestions []Suggestion, flags SourceFlags) []Suggestion
+	GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error)
+	FilterSuggestions(suggestions []Suggestion) []Suggestion
 	GetName() string
 }
 
 type SuggestionApi struct {
 	name                 string
-	sourceName           string
 	targetedConceptTypes []string
 	apiBaseURL           string
 	suggestionEndpoint   string
 	client               Client
 	systemId             string
 	failureImpact        string
-}
-
-type FalconSuggester struct {
-	SuggestionApi
 }
 
 type AuthorsSuggester struct {
@@ -117,39 +106,12 @@ type Concept struct {
 	IsFTAuthor bool   `json:"isFTAuthor,omitempty"`
 }
 
-type SourceFlags struct {
-	Flags map[string]string
+type Flags struct {
 	Debug string
 }
 
 type SuggestionsResponse struct {
 	Suggestions []Suggestion `json:"suggestions"`
-}
-
-func (sourceFlags *SourceFlags) hasFlag(value string, forConceptTypes []string) bool {
-	for conceptType, source := range sourceFlags.Flags {
-		// disambiguate between two suggesters with the same sourceName but with different targeted concept types
-		if len(forConceptTypes) > 0 && !valueInSlice(conceptType, forConceptTypes) {
-			continue
-		}
-		if source == value {
-			return true
-		}
-	}
-	return false
-}
-
-func NewFalconSuggester(falconSuggestionApiBaseURL, falconSuggestionEndpoint string, client Client) *FalconSuggester {
-	return &FalconSuggester{SuggestionApi{
-		apiBaseURL:           falconSuggestionApiBaseURL,
-		suggestionEndpoint:   falconSuggestionEndpoint,
-		client:               client,
-		name:                 "Falcon Suggestion API",
-		sourceName:           TmeSource,
-		targetedConceptTypes: []string{LocationSourceParam, OrganisationSourceParam, PersonSourceParam, TopicSourceParam},
-		systemId:             "falcon-suggestion-api",
-		failureImpact:        "Suggestions from TME won't work",
-	}}
 }
 
 func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint string, client Client) *AuthorsSuggester {
@@ -158,7 +120,6 @@ func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint 
 		suggestionEndpoint:   authorsSuggestionEndpoint,
 		client:               client,
 		name:                 "Authors Suggestion API",
-		sourceName:           AuthorsSource,
 		targetedConceptTypes: []string{PseudoConceptTypeAuthor},
 		systemId:             "authors-suggestion-api",
 		failureImpact:        "Suggesting authors from Concept Search won't work",
@@ -171,22 +132,15 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 		suggestionEndpoint:   ontotextSuggestionEndpoint,
 		client:               client,
 		name:                 "Ontotext Suggestion API",
-		sourceName:           CesSource,
 		targetedConceptTypes: []string{LocationSourceParam, OrganisationSourceParam, PersonSourceParam, TopicSourceParam},
 		systemId:             "ontotext-suggestion-api",
 		failureImpact:        "Suggesting locations, organisations and people from Ontotext won't work",
 	}}
 }
 
-func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags SourceFlags) (SuggestionsResponse, error) {
+func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
 	if flags.Debug != "" {
-		log.WithTransactionID(tid).WithField("Flags", flags.Flags).Infof("%s called", suggester.GetName())
-	}
-	if !flags.hasFlag(suggester.sourceName, suggester.targetedConceptTypes) {
-		if flags.Debug != "" {
-			log.WithTransactionID(tid).WithField("Flags", flags.Flags).Infof("%s skipped because of the flags", suggester.GetName())
-		}
-		return SuggestionsResponse{make([]Suggestion, 0)}, nil
+		log.WithTransactionID(tid).WithField("Flags", flags.Debug).Infof("%s called", suggester.GetName())
 	}
 
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
@@ -230,12 +184,12 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags
 	return response, nil
 }
 
-func (suggester *SuggestionApi) FilterSuggestions(suggestions []Suggestion, flags SourceFlags) []Suggestion {
-	filtered := []Suggestion{}
+func (suggester *SuggestionApi) FilterSuggestions(suggestions []Suggestion) []Suggestion {
+	var filtered []Suggestion
 
 	for _, suggestion := range suggestions {
 		for _, conceptType := range suggester.targetedConceptTypes {
-			if flags.Flags[conceptType] == suggester.sourceName && typeValidators[conceptType](suggestion) {
+			if typeValidators[conceptType](suggestion) {
 				filtered = append(filtered, suggestion)
 				break
 			}
@@ -254,7 +208,7 @@ func (suggester *SuggestionApi) Check() health.Check {
 		ID:               suggester.systemId,
 		BusinessImpact:   suggester.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", suggester.name),
-		PanicGuide:       "https://dewey.in.ft.com/view/system/public-suggestions-api",
+		PanicGuide:       "https://biz-ops.in.ft.com/System/public-suggestions-api",
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", suggester.name),
 		Checker:          suggester.healthCheck,
@@ -280,13 +234,4 @@ func (suggester *SuggestionApi) healthCheck() (string, error) {
 		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
 	}
 	return fmt.Sprintf("%v is healthy", suggester.name), nil
-}
-
-func valueInSlice(val string, slice []string) bool {
-	for _, sliceVal := range slice {
-		if sliceVal == val {
-			return true
-		}
-	}
-	return false
 }

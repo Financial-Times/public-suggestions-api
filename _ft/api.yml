@@ -58,7 +58,7 @@ paths:
           schema:
             type: object
             example:
-              uuid: 9d5e441e-0b02-11e8-8eb7-42f857ea9f0
+              id: http://www.ft.com/thing/9d5e441e-0b02-11e8-8eb7-42f857ea9f0
               title: Wall Street stocks xxx
               alternativeTitles:
                 promotionalTitle: Wall Street volatile amid global equities rout

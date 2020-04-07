@@ -1,53 +1,9 @@
-version: 2
+version: 2.1
+
+orbs:
+  ft-golang-ci: financial-times/golang-ci@1
+
 jobs:
-  build:
-    working_directory: /go/src/github.com/Financial-Times/public-suggestions-api
-    docker:
-      - image: golang:1
-        environment:
-          GOPATH: /go
-          CIRCLE_TEST_REPORTS: /tmp/test-results
-          CIRCLE_COVERAGE_REPORT: /tmp/coverage-results
-    steps:
-      - checkout
-      - run:
-          name: External Dependencies
-          command: |
-            go get -u github.com/mattn/goveralls
-            go get -u github.com/jstemmer/go-junit-report
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-            go get -u github.com/haya14busa/goverage
-      - run:
-          name: Test Results
-          command: |
-            mkdir -p ${CIRCLE_TEST_REPORTS}
-            mkdir -p ${CIRCLE_COVERAGE_REPORT}
-      - run:
-          name: Download vendored dependancies
-          command: dep ensure -v -vendor-only
-      - run:
-          name: Go Build
-          command: go build -v
-      - run:
-          name: Run Tests
-          command: |
-            go test -race -v ./... | /go/bin/go-junit-report > ${CIRCLE_TEST_REPORTS}/main.xml
-            goverage -covermode=atomic -race -coverprofile=${CIRCLE_COVERAGE_REPORT}/coverage.out ./...
-      - run:
-          name: Upload Coverage
-          command: /go/bin/goveralls -coverprofile=${CIRCLE_COVERAGE_REPORT}/coverage.out -service=circle-ci -repotoken=$COVERALLS_TOKEN
-      - store_test_results:
-          path: /tmp/test-results
-  dockerfile:
-    working_directory: /public-suggestions-api
-    docker:
-      - image: docker:18
-    steps:
-      - checkout
-      - setup_docker_engine
-      - run:
-          name: Build Dockerfile
-          command: docker build -t test/public-suggestions-api .
   dredd:
     working_directory: /go/src/github.com/Financial-Times/public-suggestions-api
     docker:
@@ -63,20 +19,16 @@ jobs:
     steps:
       - checkout
       - run:
-          name: External Dependencies
-          command: |
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-      - run:
-          name: Download vendored dependancies
-          command: dep ensure -v -vendor-only
+          name: Load ersatz-fixtures.yml to ersatz image
+          command: "curl -X POST --data-binary @_ft/ersatz-fixtures.yml -H \"Content-type: text/x-yaml\" http://localhost:9000/__configure"
       - run:
           name: Go Build
-          command: go build -v
+          command: go build -mod=readonly -v
       - run:
           name: Download dredd
           command: |
-            curl -sL https://deb.nodesource.com/setup_11.x | bash -
-            DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs=11.\*
+            curl -sL https://deb.nodesource.com/setup_12.x | bash -
+            DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs=12.\*
             npm install -g --unsafe-perm --loglevel warn --user 0 --no-progress dredd@8.0.0
             rm -rf /var/lib/apt/lists/*
       - run:
@@ -84,11 +36,17 @@ jobs:
           command: dredd
 
 workflows:
-  version: 2
-  test-and-build-docker:
+  tests_and_docker:
     jobs:
-      - build
-      - dredd
-      - dockerfile:
+      - ft-golang-ci/build-and-test:
+          name: build-and-test-project
+      - dredd    
+      - ft-golang-ci/docker-build:
+          name: build-docker-image
           requires:
-            - build
+            - build-and-test-project
+  snyk-scanning:
+    jobs:
+      - ft-golang-ci/scan:
+          name: scan-dependencies
+          context: cm-team-snyk

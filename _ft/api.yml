@@ -173,7 +173,7 @@ paths:
                   severity: 1
                   businessImpact: A business impact this failure might have
                   technicalSummary: A technical description of what's gone wrong
-                  panicGuide: https://biz-ops.in.ft.com/System/biz-ops-system-code
+                  panicGuide: https://runbooks.in.ft.com/public-suggestions-api
                   checkOutput: Technical output from the check
                   lastUpdated: 2017-08-03T10:44:32.324709638+01:00
               ok: true

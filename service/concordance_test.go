@@ -23,7 +23,7 @@ func TestConcordanceService_CheckHealth(t *testing.T) {
 	expect.Equal("internal-concordances", check.ID)
 	expect.Equal("Suggestions won't work", check.BusinessImpact)
 	expect.Equal("internal-concordances Healthcheck", check.Name)
-	expect.Equal("https://biz-ops.in.ft.com/System/internal-concordances", check.PanicGuide)
+	expect.Equal("https://runbooks.in.ft.com/internal-concordances", check.PanicGuide)
 	expect.Equal("internal-concordances is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)

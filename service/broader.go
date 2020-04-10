@@ -50,7 +50,7 @@ func (b *BroaderConceptsProvider) Check() v1_1.Check {
 		ID:               b.systemID,
 		BusinessImpact:   b.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", b.name),
-		PanicGuide:       "https://biz-ops.in.ft.com/System/public-things-api",
+		PanicGuide:       "https://runbooks.in.ft.com/public-things-api",
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", b.name),
 		Checker:          b.healthCheck,

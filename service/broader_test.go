@@ -27,7 +27,7 @@ func TestBroaderConceptsProvider_CheckHealth(t *testing.T) {
 	expect.Equal("public-things-api", check.ID)
 	expect.Equal("Excluding broader concepts will not work", check.BusinessImpact)
 	expect.Equal("public-things-api Healthcheck", check.Name)
-	expect.Equal("https://biz-ops.in.ft.com/System/public-things-api", check.PanicGuide)
+	expect.Equal("https://runbooks.in.ft.com/public-things-api", check.PanicGuide)
 	expect.Equal("public-things-api is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)

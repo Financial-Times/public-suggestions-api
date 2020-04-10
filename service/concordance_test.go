@@ -2,10 +2,11 @@ package service
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestConcordanceService_CheckHealth(t *testing.T) {
@@ -53,7 +54,7 @@ func TestConcordanceService_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
 	expect.Empty(checkResult)
 }
 

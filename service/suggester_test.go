@@ -227,7 +227,7 @@ func TestAuthorsSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
 	expect.Empty(checkResult)
 }
 
@@ -269,7 +269,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
-	expect.Equal("parse ://content/suggest: missing protocol scheme", err.Error())
+	expect.Equal("parse \"://content/suggest\": missing protocol scheme", err.Error())
 }
 
 func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
@@ -367,7 +367,7 @@ func TestOntotextSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
 	expect.Empty(checkResult)
 }
 

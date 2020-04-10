@@ -58,7 +58,7 @@ func TestBroaderConceptsProvider_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
 	expect.Empty(checkResult)
 }
 

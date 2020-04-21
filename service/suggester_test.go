@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
@@ -225,9 +226,10 @@ func TestAuthorsSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 
 	suggester := NewAuthorsSuggester(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	var urlErr *url.Error
+	if expect.True(errors.As(err, &urlErr)) {
+		expect.Equal("parse", urlErr.Op)
+	}
 	expect.Empty(checkResult)
 }
 
@@ -268,8 +270,10 @@ func TestOntotextSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", Flags{})
 
 	expect.Nil(suggestionResp.Suggestions)
-	expect.Error(err)
-	expect.Equal("parse ://content/suggest: missing protocol scheme", err.Error())
+	var urlErr *url.Error
+	if expect.True(errors.As(err, &urlErr)) {
+		expect.Equal("parse", urlErr.Op)
+	}
 }
 
 func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
@@ -366,8 +370,10 @@ func TestOntotextSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 	suggester := NewOntotextSuggester(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
 
-	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	var urlErr *url.Error
+	if expect.True(errors.As(err, &urlErr)) {
+		expect.Equal("parse", urlErr.Op)
+	}
 	expect.Empty(checkResult)
 }
 

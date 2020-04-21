@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,9 +57,10 @@ func TestBroaderConceptsProvider_CheckHealthErrorOnNewRequest(t *testing.T) {
 
 	suggester := NewBroaderConceptsProvider(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	var urlErr *url.Error
+	if expect.True(errors.As(err, &urlErr)) {
+		expect.Equal("parse", urlErr.Op)
+	}
 	expect.Empty(checkResult)
 }
 

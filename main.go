@@ -12,7 +12,7 @@ import (
 
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/Financial-Times/go-logger/v2"
-	"github.com/Financial-Times/http-handlers-go/httphandlers"
+	"github.com/Financial-Times/http-handlers-go/v2/httphandlers"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
@@ -161,7 +161,7 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *Hea
 	servicesRouter.HandleFunc(suggestPath, handler.HandleSuggestion).Methods(http.MethodPost)
 
 	var monitoringRouter http.Handler = servicesRouter
-	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log.Logger, monitoringRouter)
+	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log, monitoringRouter)
 	monitoringRouter = httphandlers.HTTPMetricsHandler(metrics.DefaultRegistry, monitoringRouter)
 
 	serveMux.Handle("/", monitoringRouter)

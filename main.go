@@ -45,6 +45,12 @@ func main() {
 		Desc:   "Port to listen on",
 		EnvVar: "APP_PORT",
 	})
+	logLevel := app.String(cli.StringOpt{
+		Name:   "log-level",
+		Value:  "info",
+		Desc:   "Log level",
+		EnvVar: "LOG_LEVEL",
+	})
 	authorsSuggestionApiBaseURL := app.String(cli.StringOpt{
 		Name:   "authors-suggestion-api-base-url",
 		Value:  "http://authors-suggestion-api:8080",
@@ -109,7 +115,7 @@ func main() {
 		EnvVar: "CONCEPT_BLACKLISTER_ENDPOINT",
 	})
 
-	log := logger.NewUPPLogger(*appSystemCode, "info")
+	log := logger.NewUPPLogger(*appSystemCode, *logLevel)
 	app.Action = func() {
 		log.Infof("App Name: %s, Port: %s", *appName, *port)
 

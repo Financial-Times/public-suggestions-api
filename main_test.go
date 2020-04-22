@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Financial-Times/go-logger/v2"
+
 	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
@@ -249,6 +251,7 @@ func TestRequestHandler_all(t *testing.T) {
 		Timeout:   30 * time.Second,
 	}
 
+	log := logger.NewUPPLogger("test-service", "panic")
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
 	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
@@ -259,7 +262,7 @@ func TestRequestHandler_all(t *testing.T) {
 	healthService := NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
-		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
+		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService, log)
 	}()
 	client := &http.Client{}
 

@@ -69,22 +69,22 @@ type Suggester interface {
 	GetName() string
 }
 
-type SuggestionApi struct {
+type SuggestionAPI struct {
 	name                 string
 	targetedConceptTypes []string
 	apiBaseURL           string
 	suggestionEndpoint   string
 	client               Client
-	systemId             string
+	systemID             string
 	failureImpact        string
 }
 
 type AuthorsSuggester struct {
-	SuggestionApi
+	SuggestionAPI
 }
 
 type OntotextSuggester struct {
-	SuggestionApi
+	SuggestionAPI
 }
 
 type Suggestion struct {
@@ -108,31 +108,31 @@ type SuggestionsResponse struct {
 	Suggestions []Suggestion `json:"suggestions"`
 }
 
-func NewAuthorsSuggester(authorsSuggestionApiBaseURL, authorsSuggestionEndpoint string, client Client) *AuthorsSuggester {
-	return &AuthorsSuggester{SuggestionApi{
-		apiBaseURL:           authorsSuggestionApiBaseURL,
+func NewAuthorsSuggester(authorsSuggestionAPIBaseURL, authorsSuggestionEndpoint string, client Client) *AuthorsSuggester {
+	return &AuthorsSuggester{SuggestionAPI{
+		apiBaseURL:           authorsSuggestionAPIBaseURL,
 		suggestionEndpoint:   authorsSuggestionEndpoint,
 		client:               client,
 		name:                 "Authors Suggestion API",
 		targetedConceptTypes: []string{PseudoConceptTypeAuthor},
-		systemId:             "authors-suggestion-api",
+		systemID:             "authors-suggestion-api",
 		failureImpact:        "Suggesting authors from Concept Search won't work",
 	}}
 }
 
-func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoint string, client Client) *OntotextSuggester {
-	return &OntotextSuggester{SuggestionApi{
-		apiBaseURL:           ontotextSuggestionApiBaseURL,
+func NewOntotextSuggester(ontotextSuggestionAPIBaseURL, ontotextSuggestionEndpoint string, client Client) *OntotextSuggester {
+	return &OntotextSuggester{SuggestionAPI{
+		apiBaseURL:           ontotextSuggestionAPIBaseURL,
 		suggestionEndpoint:   ontotextSuggestionEndpoint,
 		client:               client,
 		name:                 "Ontotext Suggestion API",
 		targetedConceptTypes: []string{LocationSourceParam, OrganisationSourceParam, PersonSourceParam, TopicSourceParam},
-		systemId:             "ontotext-suggestion-api",
+		systemID:             "ontotext-suggestion-api",
 		failureImpact:        "Suggesting locations, organisations and people from Ontotext won't work",
 	}}
 }
 
-func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
+func (suggester *SuggestionAPI) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
 	if flags.Debug != "" {
 		log.WithTransactionID(tid).WithField("Flags", flags.Debug).Infof("%s called", suggester.GetName())
 	}
@@ -178,7 +178,7 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags
 	return response, nil
 }
 
-func (suggester *SuggestionApi) FilterSuggestions(suggestions []Suggestion) []Suggestion {
+func (suggester *SuggestionAPI) FilterSuggestions(suggestions []Suggestion) []Suggestion {
 	var filtered []Suggestion
 
 	for _, suggestion := range suggestions {
@@ -193,13 +193,13 @@ func (suggester *SuggestionApi) FilterSuggestions(suggestions []Suggestion) []Su
 	return filtered
 }
 
-func (suggester *SuggestionApi) GetName() string {
+func (suggester *SuggestionAPI) GetName() string {
 	return suggester.name
 }
 
-func (suggester *SuggestionApi) Check() health.Check {
+func (suggester *SuggestionAPI) Check() health.Check {
 	return health.Check{
-		ID:               suggester.systemId,
+		ID:               suggester.systemID,
 		BusinessImpact:   suggester.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", suggester.name),
 		PanicGuide:       "https://runbooks.in.ft.com/public-suggestions-api",
@@ -209,7 +209,7 @@ func (suggester *SuggestionApi) Check() health.Check {
 	}
 }
 
-func (suggester *SuggestionApi) healthCheck() (string, error) {
+func (suggester *SuggestionAPI) healthCheck() (string, error) {
 	req, err := http.NewRequest("GET", suggester.apiBaseURL+"/__gtg", nil)
 	if err != nil {
 		return "", err

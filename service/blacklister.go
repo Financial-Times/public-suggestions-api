@@ -17,7 +17,7 @@ type ConceptBlacklister interface {
 }
 
 type Blacklister struct {
-	baseUrl       string
+	baseURL       string
 	endpoint      string
 	client        Client
 	systemID      string
@@ -29,9 +29,9 @@ type Blacklist struct {
 	UUIDS []string `json:"uuids"`
 }
 
-func NewConceptBlacklister(baseUrl string, endpoint string, client Client) ConceptBlacklister {
+func NewConceptBlacklister(baseURL string, endpoint string, client Client) ConceptBlacklister {
 	return &Blacklister{
-		baseUrl:       baseUrl,
+		baseURL:       baseURL,
 		endpoint:      endpoint,
 		client:        client,
 		systemID:      "concept-suggestions-blacklister",
@@ -50,7 +50,7 @@ func (b *Blacklister) IsBlacklisted(conceptId string, bl Blacklist) bool {
 }
 
 func (b *Blacklister) GetBlacklist(tid string) (Blacklist, error) {
-	req, err := http.NewRequest("GET", b.baseUrl+b.endpoint, nil)
+	req, err := http.NewRequest("GET", b.baseURL+b.endpoint, nil)
 	if err != nil {
 		return Blacklist{}, err
 	}
@@ -95,7 +95,7 @@ func (b *Blacklister) Check() v1_1.Check {
 }
 
 func (b *Blacklister) healthCheck() (string, error) {
-	req, err := http.NewRequest("GET", b.baseUrl+"/__gtg", nil)
+	req, err := http.NewRequest("GET", b.baseURL+"/__gtg", nil)
 	if err != nil {
 		return "", err
 	}

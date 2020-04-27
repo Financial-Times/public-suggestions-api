@@ -12,7 +12,7 @@ import (
 const idsParamName = "ids"
 
 type ConcordanceService struct {
-	systemId            string
+	systemID            string
 	name                string
 	ConcordanceBaseURL  string
 	ConcordanceEndpoint string
@@ -24,20 +24,20 @@ type ConcordanceResponse struct {
 	Concepts map[string]Concept `json:"concepts"`
 }
 
-func NewConcordance(internalConcordancesApiBaseURL, internalConcordancesEndpoint string, client Client) *ConcordanceService {
+func NewConcordance(internalConcordancesAPIBaseURL, internalConcordancesEndpoint string, client Client) *ConcordanceService {
 	return &ConcordanceService{
-		ConcordanceBaseURL:  internalConcordancesApiBaseURL,
+		ConcordanceBaseURL:  internalConcordancesAPIBaseURL,
 		ConcordanceEndpoint: internalConcordancesEndpoint,
 		Client:              client,
 		name:                "internal-concordances",
-		systemId:            "internal-concordances",
+		systemID:            "internal-concordances",
 		failureImpact:       "Suggestions won't work",
 	}
 }
 
 func (concordance *ConcordanceService) Check() v1_1.Check {
 	return v1_1.Check{
-		ID:               concordance.systemId,
+		ID:               concordance.systemID,
 		BusinessImpact:   concordance.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", concordance.name),
 		PanicGuide:       "https://runbooks.in.ft.com/internal-concordances",

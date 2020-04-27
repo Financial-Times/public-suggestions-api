@@ -16,7 +16,7 @@ import (
 	"github.com/Financial-Times/public-suggestions-api/web"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
 	"github.com/gorilla/mux"
-	"github.com/jawher/mow.cli"
+	cli "github.com/jawher/mow.cli"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -44,7 +44,7 @@ func main() {
 		Desc:   "Port to listen on",
 		EnvVar: "APP_PORT",
 	})
-	authorsSuggestionApiBaseURL := app.String(cli.StringOpt{
+	authorsSuggestionAPIBaseURL := app.String(cli.StringOpt{
 		Name:   "authors-suggestion-api-base-url",
 		Value:  "http://authors-suggestion-api:8080",
 		Desc:   "The base URL to authors suggestion api",
@@ -56,7 +56,7 @@ func main() {
 		Desc:   "The endpoint for authors suggestion api",
 		EnvVar: "AUTHORS_SUGGESTION_ENDPOINT",
 	})
-	ontotextSuggestionApiBaseURL := app.String(cli.StringOpt{
+	ontotextSuggestionAPIBaseURL := app.String(cli.StringOpt{
 		Name:   "ontotext-suggestion-api-base-url",
 		Value:  "http://ontotext-suggestion-api:8080",
 		Desc:   "The base URL to ontotext suggestion api",
@@ -69,7 +69,7 @@ func main() {
 		EnvVar: "ONTOTEXT_SUGGESTION_ENDPOINT",
 	})
 
-	internalConcordancesApiBaseURL := app.String(cli.StringOpt{
+	internalConcordancesAPIBaseURL := app.String(cli.StringOpt{
 		Name:   "internal-concordances-api-base-url",
 		Value:  "http://internal-concordances:8080",
 		Desc:   "The base URL for internal concordances api",
@@ -95,7 +95,7 @@ func main() {
 		EnvVar: "PUBLIC_THINGS_ENDPOINT",
 	})
 
-	conceptBlacklisterBaseUrl := app.String(cli.StringOpt{
+	conceptBlacklisterBaseURL := app.String(cli.StringOpt{
 		Name:   "concept-blacklister-base-url",
 		Value:  "http://concept-suggestions-blacklister:8080",
 		Desc:   "The base URL for concept suggester blacklister",
@@ -126,12 +126,12 @@ func main() {
 			Timeout:   10 * time.Second,
 		}
 
-		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
-		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionApiBaseURL, *ontotextSuggestionEndpoint, c)
+		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionAPIBaseURL, *authorsSuggestionEndpoint, c)
+		ontotextSuggester := service.NewOntotextSuggester(*ontotextSuggestionAPIBaseURL, *ontotextSuggestionEndpoint, c)
 		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
-		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
+		concordanceService := service.NewConcordance(*internalConcordancesAPIBaseURL, *internalConcordancesEndpoint, c)
+		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseURL, *conceptBlacklisterEndpoint, c)
 		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
 		healthService := NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
 

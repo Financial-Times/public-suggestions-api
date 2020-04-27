@@ -37,7 +37,7 @@ const sampleJSONResponse = `{
     ]
 }`
 
-type mockHttpClient struct {
+type mockHTTPClient struct {
 	mock.Mock
 }
 
@@ -45,25 +45,25 @@ type mockResponseBody struct {
 	mock.Mock
 }
 
-type mockSuggestionApi struct {
+type mockSuggestionAPI struct {
 	mock.Mock
 }
 
-func (m *mockSuggestionApi) FilterSuggestions(suggestions []Suggestion) []Suggestion {
+func (m *mockSuggestionAPI) FilterSuggestions(suggestions []Suggestion) []Suggestion {
 	args := m.Called(suggestions)
 	return args.Get(0).([]Suggestion)
 }
 
-func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
+func (m *mockSuggestionAPI) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
 	args := m.Called(payload, tid)
 	return args.Get(0).(SuggestionsResponse), args.Error(1)
 }
 
-func (m *mockSuggestionApi) GetName() string {
+func (m *mockSuggestionAPI) GetName() string {
 	return "Mock Suggestion API"
 }
 
-type mockSuggestionApiServer struct {
+type mockSuggestionAPIServer struct {
 	mock.Mock
 }
 
@@ -76,7 +76,7 @@ func (cb *ClosingBuffer) Close() (err error) {
 	return
 }
 
-func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server {
+func (m *mockSuggestionAPIServer) startMockServer(t *testing.T) *httptest.Server {
 	router := mux.NewRouter()
 	router.HandleFunc("/content/suggest", func(w http.ResponseWriter, r *http.Request) {
 		ua := r.Header.Get("User-Agent")
@@ -106,17 +106,17 @@ func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server
 	return httptest.NewServer(router)
 }
 
-func (m *mockSuggestionApiServer) GTG() int {
+func (m *mockSuggestionAPIServer) GTG() int {
 	args := m.Called()
 	return args.Int(0)
 }
 
-func (m *mockSuggestionApiServer) UploadRequest(body []byte, tid, contentTypeHeader, acceptHeader string) (int, interface{}) {
+func (m *mockSuggestionAPIServer) UploadRequest(body []byte, tid, contentTypeHeader, acceptHeader string) (int, interface{}) {
 	args := m.Called(body, tid, contentTypeHeader, acceptHeader)
 	return args.Int(0), args.Get(1)
 }
 
-func (c *mockHttpClient) Do(req *http.Request) (resp *http.Response, err error) {
+func (c *mockHTTPClient) Do(req *http.Request) (resp *http.Response, err error) {
 	args := c.Called(req)
 	return args.Get(0).(*http.Response), args.Error(1)
 }
@@ -164,7 +164,7 @@ func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T
 
 	body, err := json.Marshal(&expectedSuggestions)
 	expect.NoError(err)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -184,7 +184,7 @@ func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T
 
 func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("GTG").Return(200)
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -206,7 +206,7 @@ func TestAuthorsSuggester_CheckHealth(t *testing.T) {
 
 func TestAuthorsSuggester_CheckHealthUnhealthy(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -227,13 +227,13 @@ func TestAuthorsSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
+	assert.Error(t, err, "Missing protocol scheme should produce error")
 	expect.Empty(checkResult)
 }
 
 func TestAuthorsSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
 	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewAuthorsSuggester("http://test-url", "/__gtg", mockClient)
@@ -247,7 +247,7 @@ func TestAuthorsSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
 
 func TestOntotextSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusServiceUnavailable, nil)
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -269,12 +269,12 @@ func TestOntotextSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 
 	expect.Nil(suggestionResp.Suggestions)
 	expect.Error(err)
-	expect.Equal("parse \"://content/suggest\": missing protocol scheme", err.Error())
+	assert.Error(t, err, "Missing protocol scheme should produce error")
 }
 
 func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewOntotextSuggester("http://test-url", "/content/suggest", mockClient)
@@ -288,7 +288,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 
 func TestOntotextSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockBody := new(mockResponseBody)
 
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: mockBody}, nil)
@@ -307,7 +307,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 
 func TestOntotextSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("UploadRequest", []byte("{}"), "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte{})
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -324,7 +324,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) 
 
 func TestOntotextSuggester_CheckHealth(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("GTG").Return(200)
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -346,7 +346,7 @@ func TestOntotextSuggester_CheckHealth(t *testing.T) {
 
 func TestOntotextSuggester_CheckHealthUnhealthy(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -367,13 +367,13 @@ func TestOntotextSuggester_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
+	assert.Error(t, err, "Missing protocol scheme should produce error")
 	expect.Empty(checkResult)
 }
 
 func TestOntotextSuggester_CheckHealthErrorOnRequestDo(t *testing.T) {
 	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewOntotextSuggester("http://test-url", "/__gtg", mockClient)
@@ -413,7 +413,7 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	body, err := json.Marshal(&expectedSuggestions)
 	expect.NoError(err)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("UploadRequest", body, "tid_test", "application/json", "application/json").Return(http.StatusOK, []byte(sampleJSONResponse))
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -435,7 +435,7 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 func TestOntotext_ErrorFromService(t *testing.T) {
 	expect := assert.New(t)
 
-	ontotextHTTPMock := new(mockHttpClient)
+	ontotextHTTPMock := new(mockHTTPClient)
 	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, fmt.Errorf("Error from ontotext-suggestion-api"))
 
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)

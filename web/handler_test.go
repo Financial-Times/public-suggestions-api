@@ -26,11 +26,11 @@ func init() {
 	log.InitLogger("handler_test", "ERROR")
 }
 
-type mockHttpClient struct {
+type mockHTTPClient struct {
 	mock.Mock
 }
 
-func (c *mockHttpClient) Do(req *http.Request) (resp *http.Response, err error) {
+func (c *mockHTTPClient) Do(req *http.Request) (resp *http.Response, err error) {
 	args := c.Called(req)
 	return args.Get(0).(*http.Response), args.Error(1)
 }
@@ -98,8 +98,8 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		},
 	}}
 
-	mockClient := new(mockHttpClient)
-	mockPublicThings := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
@@ -125,7 +125,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{}, nil)
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -156,16 +156,16 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -197,16 +197,16 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -238,16 +238,16 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -279,9 +279,9 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
@@ -290,7 +290,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -321,9 +321,9 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	service.NoContentError = errors.New("No content error")
@@ -335,7 +335,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -367,9 +367,9 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
@@ -378,7 +378,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),
@@ -410,9 +410,9 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockSuggester := new(mockSuggesterService)
-	mockPublicThings := new(mockHttpClient)
+	mockPublicThings := new(mockHTTPClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
@@ -432,7 +432,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
+	blacklisterMock := new(mockHTTPClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(
 			`{"uuids":[]}`)),

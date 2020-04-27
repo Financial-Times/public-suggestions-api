@@ -11,7 +11,7 @@ import (
 
 func TestConcordanceService_CheckHealth(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("GTG").Return(200).Once()
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -33,7 +33,7 @@ func TestConcordanceService_CheckHealth(t *testing.T) {
 
 func TestConcordanceService_CheckHealthUnhealthy(t *testing.T) {
 	expect := assert.New(t)
-	mockServer := new(mockSuggestionApiServer)
+	mockServer := new(mockSuggestionAPIServer)
 	mockServer.On("GTG").Return(503)
 	server := mockServer.startMockServer(t)
 	defer server.Close()
@@ -54,13 +54,13 @@ func TestConcordanceService_CheckHealthErrorOnNewRequest(t *testing.T) {
 	checkResult, err := suggester.Check().Checker()
 
 	expect.Error(err)
-	assert.Equal(t, "parse \"://__gtg\": missing protocol scheme", err.Error())
+	assert.Error(t, err, "Missing protocol scheme should produce error")
 	expect.Empty(checkResult)
 }
 
 func TestConcordanceService_CheckHealthErrorOnRequestDo(t *testing.T) {
 	expect := assert.New(t)
-	mockClient := new(mockHttpClient)
+	mockClient := new(mockHTTPClient)
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewConcordance("http://test-url", "/__gtg", mockClient)

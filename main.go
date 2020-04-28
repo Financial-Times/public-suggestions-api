@@ -137,7 +137,7 @@ func main() {
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
 		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
 		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
+		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService, log)
 
@@ -149,11 +149,11 @@ func main() {
 	}
 }
 
-func serveEndpoints(port string, handler *web.RequestHandler, healthService *HealthService, log *logger.UPPLogger) {
+func serveEndpoints(port string, handler *web.RequestHandler, healthService *web.HealthService, log *logger.UPPLogger) {
 
 	serveMux := http.NewServeMux()
 
-	serveMux.HandleFunc(healthPath, fthealth.Handler(healthService))
+	serveMux.HandleFunc(web.HealthPath, fthealth.Handler(healthService))
 	serveMux.HandleFunc(status.GTGPath, status.NewGoodToGoHandler(healthService.GTG))
 	serveMux.HandleFunc(status.BuildInfoPath, status.BuildInfoHandler)
 

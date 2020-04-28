@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"time"
@@ -7,7 +7,7 @@ import (
 	"github.com/Financial-Times/service-status-go/gtg"
 )
 
-const healthPath = "/__health"
+const HealthPath = "/__health"
 
 type HealthService struct {
 	fthealth.TimedHealthCheck

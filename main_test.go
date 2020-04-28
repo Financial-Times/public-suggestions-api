@@ -259,7 +259,7 @@ func TestRequestHandler_all(t *testing.T) {
 	blacklister := service.NewConceptBlacklister(mockServer.URL, "/blacklist", c)
 
 	suggester := service.NewAggregateSuggester(concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
-	healthService := NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
+	healthService := web.NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
 		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService, log)

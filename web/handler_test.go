@@ -59,8 +59,8 @@ func (r *faultyReader) Close() error {
 	return nil
 }
 
-func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags service.Flags) (service.SuggestionsResponse, error) {
-	args := s.Called(payload, tid, flags)
+func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string) (service.SuggestionsResponse, error) {
+	args := s.Called(payload, tid)
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
@@ -121,9 +121,9 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(expectedResp, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{}, nil)
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -284,7 +284,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("timeout error"))
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -327,7 +327,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	service.NoContentError = errors.New("No content error")
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{
 		Suggestions: make([]service.Suggestion, 0),
 	}, service.NoContentError)
 
@@ -372,7 +372,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -415,7 +415,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
 		{
 			Concept: service.Concept{
 				IsFTAuthor: true,
@@ -426,7 +426,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 			},
 		},
 	}}, nil)
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("timeout error"))
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,

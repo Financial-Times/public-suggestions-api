@@ -534,7 +534,7 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 
 		excludeService := NewBroaderConceptsProvider("dummyURL", "things", publicThingsMock)
 
-		res, err := excludeService.excludeBroaderConceptsFromResponse(testCase.suggestions, "test_tid", "")
+		res, err := excludeService.excludeBroaderConceptsFromResponse(testCase.suggestions, "test_tid")
 		if err != nil {
 			ast.NotEmptyf(testCase.expectedErrorContains, "%s -> empty expected error", testCase.testName)
 			ast.Containsf(err.Error(), testCase.expectedErrorContains, "%s -> not expected error returned", testCase.testName)

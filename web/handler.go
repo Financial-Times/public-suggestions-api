@@ -25,12 +25,9 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 
 	tid := tidutils.GetTransactionIDFromRequest(request)
 
-	debug := request.Header.Get("debug")
-
 	body, err := ioutil.ReadAll(request.Body)
-	if debug != "" {
-		log.WithTransactionID(tid).WithField("debug", debug).Info(string(body))
-	}
+	// TODO
+	// log.WithTransactionID(tid).WithField("debug", debug).Info(string(body))
 	if err != nil {
 		log.WithTransactionID(tid).WithError(err).Error("Error while reading payload")
 		writeResponse(writer, http.StatusBadRequest, []byte(`{"message": "Error while reading payload"}`))
@@ -43,7 +40,7 @@ func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, requ
 		return
 	}
 
-	suggestions, err := handler.Suggester.GetSuggestions(body, tid, service.Flags{Debug: debug})
+	suggestions, err := handler.Suggester.GetSuggestions(body, tid)
 	if err != nil {
 		errMsg := "aggregating suggestions failed!"
 		log.WithTransactionID(tid).WithError(err).Error(errMsg)

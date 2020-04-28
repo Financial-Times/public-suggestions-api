@@ -68,7 +68,7 @@ func (concordance *ConcordanceService) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", concordance.name), nil
 }
 
-func (concordance *ConcordanceService) getConcordances(ids []string, tid string, debugFlag string) (ConcordanceResponse, error) {
+func (concordance *ConcordanceService) getConcordances(ids []string, tid string) (ConcordanceResponse, error) {
 	var concorded ConcordanceResponse
 	req, err := http.NewRequest("GET", concordance.ConcordanceBaseURL+concordance.ConcordanceEndpoint, nil)
 	if err != nil {
@@ -87,9 +87,6 @@ func (concordance *ConcordanceService) getConcordances(ids []string, tid string,
 
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", tid)
-	if debugFlag != "" {
-		req.Header.Add("debug", debugFlag)
-	}
 
 	resp, err := concordance.Client.Do(req)
 	if err != nil {

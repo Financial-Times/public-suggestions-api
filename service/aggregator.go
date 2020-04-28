@@ -23,11 +23,11 @@ func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvi
 	}
 }
 
-func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
+func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
 	data, err := getXmlSuggestionRequestFromJson(payload)
-	if flags.Debug != "" {
-		log.WithTransactionID(tid).WithField("debug", flags.Debug).Info(string(data))
-	}
+	// TODO:
+	//	log.WithTransactionID(tid).WithField("debug", flags.Debug).Info(string(data))
+
 	if err != nil {
 		data = payload
 	}
@@ -43,7 +43,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	for key, suggesterDelegate := range suggester.Suggesters {
 		wg.Add(1)
 		go func(i int, delegate Suggester) {
-			resp, err := delegate.GetSuggestions(data, tid, flags)
+			resp, err := delegate.GetSuggestions(data, tid)
 			if err != nil {
 				if err == NoContentError || err == BadRequestError {
 					log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
@@ -59,7 +59,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	}
 	wg.Wait()
 
-	responseMap, err = suggester.filterByInternalConcordances(responseMap, tid, flags.Debug)
+	responseMap, err = suggester.filterByInternalConcordances(responseMap, tid)
 	if err != nil {
 		return aggregateResp, err
 	}
@@ -70,7 +70,7 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 		}
 	}
 
-	results, err := suggester.BroaderProvider.excludeBroaderConceptsFromResponse(responseMap, tid, flags.Debug)
+	results, err := suggester.BroaderProvider.excludeBroaderConceptsFromResponse(responseMap, tid)
 	if err != nil {
 		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
 	} else {
@@ -101,10 +101,10 @@ func fetchBlacklist(b ConceptBlacklister, c chan Blacklist, tid string) {
 	close(c)
 }
 
-func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {
-	if debugFlag != "" {
-		log.WithTransactionID(tid).WithField("debug", debugFlag).Info("Calling internal concordances")
-	}
+func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Suggestion, tid string) (map[int][]Suggestion, error) {
+	// TODO:
+	//	log.WithTransactionID(tid).WithField("debug", debugFlag).Info("Calling internal concordances")
+
 	var filtered = map[int][]Suggestion{}
 	var concorded ConcordanceResponse
 
@@ -122,7 +122,7 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Su
 		return filtered, nil
 	}
 
-	concorded, err := suggester.Concordance.getConcordances(ids, tid, debugFlag)
+	concorded, err := suggester.Concordance.getConcordances(ids, tid)
 	if err != nil {
 		return filtered, err
 	}
@@ -143,9 +143,9 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Su
 		total += len(filtered[index])
 	}
 
-	if debugFlag != "" {
-		log.WithTransactionID(tid).WithField("debug", debugFlag).Infof("Retained %v of %v concepts using concordances", total, len(ids))
-	}
+	// TODO
+	//	log.WithTransactionID(tid).WithField("debug", debugFlag).Infof("Retained %v of %v concepts using concordances", total, len(ids))
+
 	return filtered, nil
 }
 

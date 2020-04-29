@@ -12,6 +12,7 @@ import (
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/go-logger/v2"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -97,7 +98,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 			},
 		},
 	}}
-
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockPublicThings := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
@@ -138,7 +139,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -156,6 +157,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -178,7 +180,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -197,6 +199,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -219,7 +222,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -238,6 +241,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -260,7 +264,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -279,6 +283,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -303,7 +308,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -321,6 +326,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -348,7 +354,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -367,6 +373,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -391,7 +398,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -410,6 +417,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -445,7 +453,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 		Suggesters:      []service.Suggester{mockSuggester},
 		BroaderProvider: broaderService,
 		Blacklister:     blacklister,
-	})
+	}, log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusServiceUnavailable, w.Code)

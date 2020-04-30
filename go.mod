@@ -4,7 +4,6 @@ go 1.14
 
 require (
 	github.com/Financial-Times/go-fthealth v0.0.0-20181009114238-ca83ad65381f
-	github.com/Financial-Times/go-logger v0.0.0-20180323124113-febee6537e90
 	github.com/Financial-Times/go-logger/v2 v2.0.1
 	github.com/Financial-Times/http-handlers-go/v2 v2.1.0
 	github.com/Financial-Times/service-status-go v0.0.0-20160323111542-3f5199736a3d

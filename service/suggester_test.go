@@ -9,10 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 
-	log "github.com/Financial-Times/go-logger"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -130,11 +128,6 @@ func (b *mockResponseBody) Read(p []byte) (n int, err error) {
 func (b *mockResponseBody) Close() error {
 	args := b.Called()
 	return args.Error(0)
-}
-
-func TestMain(m *testing.M) {
-	log.InitDefaultLogger("test")
-	os.Exit(m.Run())
 }
 
 func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T) {

@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
-	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/go-logger/v2"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/stretchr/testify/assert"
@@ -22,10 +21,6 @@ import (
 const (
 	personType = "http://www.ft.com/ontology/person/Person"
 )
-
-func init() {
-	log.InitLogger("handler_test", "ERROR")
-}
 
 type mockHttpClient struct {
 	mock.Mock
@@ -133,13 +128,9 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -175,12 +166,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -217,12 +203,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -259,12 +240,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -303,12 +279,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -349,12 +320,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -393,12 +359,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -448,12 +409,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	}, log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusServiceUnavailable, w.Code)

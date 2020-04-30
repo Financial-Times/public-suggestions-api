@@ -13,18 +13,11 @@ import (
 	"time"
 
 	"github.com/Financial-Times/go-logger/v2"
-
-	log "github.com/Financial-Times/go-logger"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestMain(m *testing.M) {
-	log.InitDefaultLogger("test")
-	os.Exit(m.Run())
-}
 
 func TestMainApp(t *testing.T) {
 	expect := require.New(t)
@@ -258,7 +251,7 @@ func TestRequestHandler_all(t *testing.T) {
 	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
 	blacklister := service.NewConceptBlacklister(mockServer.URL, "/blacklist", c)
 
-	suggester := service.NewAggregateSuggester(concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
+	suggester := service.NewAggregateSuggester(log, concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
 	healthService := web.NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {

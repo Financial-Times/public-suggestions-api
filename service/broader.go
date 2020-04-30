@@ -109,8 +109,6 @@ func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions
 		filteredSourceSuggestions := []Suggestion{}
 		for _, suggestion := range sourceSuggestions {
 			if broaderConceptsChecker[fp.Base(suggestion.ID)] {
-				// TODO:
-				// logger.WithField("ExcludedID", suggestion.ID).WithField("ExcludedPrefLabel", suggestion.PrefLabel).Info("Broader Concept excluded")
 				continue
 			}
 			filteredSourceSuggestions = append(filteredSourceSuggestions, suggestion)

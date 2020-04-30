@@ -136,7 +136,7 @@ func main() {
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
 		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
+		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
 		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester, log), healthService, log)

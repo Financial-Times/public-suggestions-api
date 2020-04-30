@@ -78,4 +78,4 @@ Admin endpoints are:
 
 ## Logging
 
-* The application uses [go-logger](https://github.com/Financial-Times/go-logger); the log file is initialised in [main.go](main.go).
+* The application uses [go-logger/v2](https://github.com/Financial-Times/go-logger/v2)

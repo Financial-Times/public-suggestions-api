@@ -7,6 +7,8 @@ import (
 	"github.com/Financial-Times/go-logger/v2"
 )
 
+const PanicGuideURL = "https://runbooks.in.ft.com/"
+
 type AggregateSuggester struct {
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider

@@ -40,7 +40,7 @@ func (concordance *ConcordanceService) Check() v1_1.Check {
 		ID:               concordance.systemId,
 		BusinessImpact:   concordance.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", concordance.name),
-		PanicGuide:       "https://biz-ops.in.ft.com/System/internal-concordances",
+		PanicGuide:       PanicGuideURL + concordance.systemId,
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", concordance.name),
 		Checker:          concordance.healthCheck,

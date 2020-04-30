@@ -192,7 +192,7 @@ func (suggester *SuggestionApi) Check() health.Check {
 		ID:               suggester.systemId,
 		BusinessImpact:   suggester.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", suggester.name),
-		PanicGuide:       "https://biz-ops.in.ft.com/System/public-suggestions-api",
+		PanicGuide:       PanicGuideURL + suggester.systemId,
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", suggester.name),
 		Checker:          suggester.healthCheck,

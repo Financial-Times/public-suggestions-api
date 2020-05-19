@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	fp "path/filepath"
 	"sync"
 
@@ -49,10 +50,12 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 		go func(i int, delegate Suggester) {
 			resp, sErr := delegate.GetSuggestions(data, tid)
 			if sErr != nil {
-				if sErr == NoContentError || sErr == BadRequestError {
-					logEntry.WithField("tid", tid).Warn(sErr.Error())
+				errMsg := "error calling " + delegate.GetName()
+				errEntry := logEntry.WithError(sErr)
+				if errors.Is(sErr, NoContentError) || errors.Is(sErr, BadRequestError) {
+					errEntry.Warn(errMsg)
 				} else {
-					logEntry.WithField("tid", tid).WithError(sErr).Errorf("Error calling %v", delegate.GetName())
+					errEntry.Error(errMsg)
 				}
 			}
 			mutex.Lock()

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func TestBroaderConceptsProvider_CheckHealth(t *testing.T) {
 	expect.Equal("public-things-api", check.ID)
 	expect.Equal("Excluding broader concepts will not work", check.BusinessImpact)
 	expect.Equal("public-things-api Healthcheck", check.Name)
-	expect.Equal("https://biz-ops.in.ft.com/System/public-things-api", check.PanicGuide)
+	expect.Equal("https://runbooks.in.ft.com/public-things-api", check.PanicGuide)
 	expect.Equal("public-things-api is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)
@@ -56,9 +57,10 @@ func TestBroaderConceptsProvider_CheckHealthErrorOnNewRequest(t *testing.T) {
 
 	suggester := NewBroaderConceptsProvider(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	var urlErr *url.Error
+	if expect.True(errors.As(err, &urlErr)) {
+		expect.Equal("parse", urlErr.Op)
+	}
 	expect.Empty(checkResult)
 }
 
@@ -532,7 +534,7 @@ func TestBroaderService_excludeBroaderConcepts(t *testing.T) {
 
 		excludeService := NewBroaderConceptsProvider("dummyURL", "things", publicThingsMock)
 
-		res, err := excludeService.excludeBroaderConceptsFromResponse(testCase.suggestions, "test_tid", "")
+		res, err := excludeService.excludeBroaderConceptsFromResponse(testCase.suggestions, "test_tid")
 		if err != nil {
 			ast.NotEmptyf(testCase.expectedErrorContains, "%s -> empty expected error", testCase.testName)
 			ast.Containsf(err.Error(), testCase.expectedErrorContains, "%s -> not expected error returned", testCase.testName)

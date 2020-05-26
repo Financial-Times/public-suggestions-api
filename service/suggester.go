@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	health "github.com/Financial-Times/go-fthealth/v1_1"
-	log "github.com/Financial-Times/go-logger"
 )
 
 const (
@@ -64,7 +63,7 @@ type Client interface {
 }
 
 type Suggester interface {
-	GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error)
+	GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error)
 	FilterSuggestions(suggestions []Suggestion) []Suggestion
 	GetName() string
 }
@@ -100,10 +99,6 @@ type Concept struct {
 	IsFTAuthor bool   `json:"isFTAuthor,omitempty"`
 }
 
-type Flags struct {
-	Debug string
-}
-
 type SuggestionsResponse struct {
 	Suggestions []Suggestion `json:"suggestions"`
 }
@@ -132,18 +127,13 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 	}}
 }
 
-func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
-	if flags.Debug != "" {
-		log.WithTransactionID(tid).WithField("Flags", flags.Debug).Infof("%s called", suggester.GetName())
-	}
+func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
 
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
 		return SuggestionsResponse{}, err
 	}
-	if flags.Debug != "" {
-		req.Header.Add("debug", flags.Debug)
-	}
+
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
@@ -202,7 +192,7 @@ func (suggester *SuggestionApi) Check() health.Check {
 		ID:               suggester.systemId,
 		BusinessImpact:   suggester.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", suggester.name),
-		PanicGuide:       "https://biz-ops.in.ft.com/System/public-suggestions-api",
+		PanicGuide:       PanicGuideURL + suggester.systemId,
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", suggester.name),
 		Checker:          suggester.healthCheck,

@@ -40,7 +40,7 @@ func (concordance *ConcordanceService) Check() v1_1.Check {
 		ID:               concordance.systemId,
 		BusinessImpact:   concordance.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", concordance.name),
-		PanicGuide:       "https://biz-ops.in.ft.com/System/internal-concordances",
+		PanicGuide:       PanicGuideURL + concordance.systemId,
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", concordance.name),
 		Checker:          concordance.healthCheck,
@@ -68,7 +68,7 @@ func (concordance *ConcordanceService) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", concordance.name), nil
 }
 
-func (concordance *ConcordanceService) getConcordances(ids []string, tid string, debugFlag string) (ConcordanceResponse, error) {
+func (concordance *ConcordanceService) getConcordances(ids []string, tid string) (ConcordanceResponse, error) {
 	var concorded ConcordanceResponse
 	req, err := http.NewRequest("GET", concordance.ConcordanceBaseURL+concordance.ConcordanceEndpoint, nil)
 	if err != nil {
@@ -87,9 +87,6 @@ func (concordance *ConcordanceService) getConcordances(ids []string, tid string,
 
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
 	req.Header.Add("X-Request-Id", tid)
-	if debugFlag != "" {
-		req.Header.Add("debug", debugFlag)
-	}
 
 	resp, err := concordance.Client.Do(req)
 	if err != nil {

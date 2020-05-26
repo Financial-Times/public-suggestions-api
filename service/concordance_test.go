@@ -2,10 +2,12 @@ package service
 
 import (
 	"errors"
+	"net/http"
+	"net/url"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"net/http"
-	"testing"
 )
 
 func TestConcordanceService_CheckHealth(t *testing.T) {
@@ -22,7 +24,7 @@ func TestConcordanceService_CheckHealth(t *testing.T) {
 	expect.Equal("internal-concordances", check.ID)
 	expect.Equal("Suggestions won't work", check.BusinessImpact)
 	expect.Equal("internal-concordances Healthcheck", check.Name)
-	expect.Equal("https://biz-ops.in.ft.com/System/internal-concordances", check.PanicGuide)
+	expect.Equal("https://runbooks.in.ft.com/internal-concordances", check.PanicGuide)
 	expect.Equal("internal-concordances is not available", check.TechnicalSummary)
 	expect.Equal(uint8(2), check.Severity)
 	expect.NoError(err)
@@ -51,9 +53,10 @@ func TestConcordanceService_CheckHealthErrorOnNewRequest(t *testing.T) {
 
 	suggester := NewConcordance(":/", "/__gtg", http.DefaultClient)
 	checkResult, err := suggester.Check().Checker()
-
-	expect.Error(err)
-	assert.Equal(t, "parse ://__gtg: missing protocol scheme", err.Error())
+	var urlErr *url.Error
+	if expect.True(errors.As(err, &urlErr)) {
+		expect.Equal("parse", urlErr.Op)
+	}
 	expect.Empty(checkResult)
 }
 

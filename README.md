@@ -1,6 +1,8 @@
 # public-suggestions-api
 
-[![Circle CI](https://circleci.com/gh/Financial-Times/public-suggestions-api/tree/master.png?style=shield)](https://circleci.com/gh/Financial-Times/public-suggestions-api/tree/master)[![Go Report Card](https://goreportcard.com/badge/github.com/Financial-Times/public-suggestions-api)](https://goreportcard.com/report/github.com/Financial-Times/public-suggestions-api) [![Coverage Status](https://coveralls.io/repos/github/Financial-Times/public-suggestions-api/badge.svg)](https://coveralls.io/github/Financial-Times/public-suggestions-api)
+[![Circle CI](https://circleci.com/gh/Financial-Times/public-suggestions-api/tree/master.png?style=shield)](https://circleci.com/gh/Financial-Times/public-suggestions-api/tree/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Financial-Times/public-suggestions-api)](https://goreportcard.com/report/github.com/Financial-Times/public-suggestions-api)
+[![Coverage Status](https://coveralls.io/repos/github/Financial-Times/public-suggestions-api/badge.svg)](https://coveralls.io/github/Financial-Times/public-suggestions-api)
 
 ## Introduction
 
@@ -10,17 +12,14 @@ Provides annotation suggestions aggregated from multiple sources
 
 Download the source code, dependencies and test dependencies:
 
-        curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-        go get -u github.com/Financial-Times/public-suggestions-api
+        go get github.com/Financial-Times/public-suggestions-api
         cd $GOPATH/src/github.com/Financial-Times/public-suggestions-api
-        dep ensure -v -vendor-only
         go build .
 
 ## Running locally
 
 1. Run the tests and install the binary:
 
-        dep ensure -v
         go test -v -race ./...
         go install
 
@@ -79,4 +78,4 @@ Admin endpoints are:
 
 ## Logging
 
-* The application uses [go-logger](https://github.com/Financial-Times/go-logger); the log file is initialised in [main.go](main.go).
+* The application uses [go-logger/v2](https://github.com/Financial-Times/go-logger/v2)

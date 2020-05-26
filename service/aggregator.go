@@ -1,54 +1,61 @@
 package service
 
 import (
+	"errors"
 	fp "path/filepath"
 	"sync"
 
-	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/go-logger/v2"
 )
+
+const PanicGuideURL = "https://runbooks.in.ft.com/"
 
 type AggregateSuggester struct {
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider
 	Blacklister     ConceptBlacklister
 	Suggesters      []Suggester
+	Log             *logger.UPPLogger
 }
 
-func NewAggregateSuggester(concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, blacklister ConceptBlacklister, suggesters ...Suggester) *AggregateSuggester {
+func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, blacklister ConceptBlacklister, suggesters ...Suggester) *AggregateSuggester {
 	return &AggregateSuggester{
 		Concordance:     concordance,
 		Suggesters:      suggesters,
 		BroaderProvider: broaderConceptsProvider,
 		Blacklister:     blacklister,
+		Log:             log,
 	}
 }
 
-func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, flags Flags) (SuggestionsResponse, error) {
+func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+	logEntry := s.Log.WithTransactionID(tid)
+
 	data, err := getXmlSuggestionRequestFromJson(payload)
-	if flags.Debug != "" {
-		log.WithTransactionID(tid).WithField("debug", flags.Debug).Info(string(data))
-	}
 	if err != nil {
 		data = payload
 	}
-	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 
-	blacklistChannel := make(chan Blacklist, 1)
-	go fetchBlacklist(suggester.Blacklister, blacklistChannel, tid)
+	logEntry.Debugf("transformed payload: %s", string(data))
+
+	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
+	var responseMap = map[int][]Suggestion{}
 
 	var mutex = sync.Mutex{}
 	var wg = sync.WaitGroup{}
 
-	var responseMap = map[int][]Suggestion{}
-	for key, suggesterDelegate := range suggester.Suggesters {
+	for key, suggesterDelegate := range s.Suggesters {
 		wg.Add(1)
+		logEntry := logEntry
 		go func(i int, delegate Suggester) {
-			resp, err := delegate.GetSuggestions(data, tid, flags)
-			if err != nil {
-				if err == NoContentError || err == BadRequestError {
-					log.WithTransactionID(tid).WithField("tid", tid).Warn(err.Error())
+			resp, sErr := delegate.GetSuggestions(data, tid)
+			if sErr != nil {
+				errMsg := "error calling " + delegate.GetName()
+				errEntry := logEntry.WithError(sErr)
+				if errors.Is(sErr, NoContentError) || errors.Is(sErr, BadRequestError) {
+					errEntry.Warn(errMsg)
 				} else {
-					log.WithTransactionID(tid).WithField("tid", tid).WithError(err).Errorf("Error calling %v", delegate.GetName())
+					errEntry.Error(errMsg)
 				}
 			}
 			mutex.Lock()
@@ -56,35 +63,43 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 			mutex.Unlock()
 			wg.Done()
 		}(key, suggesterDelegate)
+
 	}
+
+	var blacklist Blacklist
+	wg.Add(1)
+	go func(b Blacklist) {
+		defer wg.Done()
+		blacklist, err = s.Blacklister.GetBlacklist(tid)
+		if err != nil {
+			logEntry.WithError(err).Errorf("Error retrieving concept blacklist, filtering disabled")
+		}
+	}(blacklist)
+
 	wg.Wait()
 
-	responseMap, err = suggester.filterByInternalConcordances(responseMap, tid, flags.Debug)
+	responseMap, err = s.filterByInternalConcordances(responseMap, tid)
 	if err != nil {
 		return aggregateResp, err
 	}
 
-	for key, suggesterDelegate := range suggester.Suggesters {
+	for key, suggesterDelegate := range s.Suggesters {
 		if len(responseMap[key]) > 0 {
 			responseMap[key] = suggesterDelegate.FilterSuggestions(responseMap[key])
 		}
 	}
 
-	results, err := suggester.BroaderProvider.excludeBroaderConceptsFromResponse(responseMap, tid, flags.Debug)
+	results, err := s.BroaderProvider.excludeBroaderConceptsFromResponse(responseMap, tid)
 	if err != nil {
-		log.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
+		logEntry.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
 	} else {
 		responseMap = results
 	}
 
-	blacklist := <-blacklistChannel
-
 	// preserve results order
-	for i := 0; i < len(suggester.Suggesters); i++ {
+	for i := 0; i < len(s.Suggesters); i++ {
 		for _, suggestion := range responseMap[i] {
-			if suggester.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
-				log.WithTransactionID(tid).Info("Suppressing suggestion for concept ", suggestion.ID)
-			} else {
+			if !s.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
 				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
 			}
 		}
@@ -92,25 +107,17 @@ func (suggester *AggregateSuggester) GetSuggestions(payload []byte, tid string, 
 	return aggregateResp, nil
 }
 
-func fetchBlacklist(b ConceptBlacklister, c chan Blacklist, tid string) {
-	blacklist, err := b.GetBlacklist(tid)
-	if err != nil {
-		log.WithTransactionID(tid).WithError(err).Errorf("Error retrieving concept blacklist, filtering disabled")
-	}
-	c <- blacklist
-	close(c)
-}
+func (s *AggregateSuggester) filterByInternalConcordances(suggestions map[int][]Suggestion, tid string) (map[int][]Suggestion, error) {
+	logEntry := s.Log.WithTransactionID(tid)
 
-func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {
-	if debugFlag != "" {
-		log.WithTransactionID(tid).WithField("debug", debugFlag).Info("Calling internal concordances")
-	}
+	logEntry.Debug("Calling internal concordances")
+
 	var filtered = map[int][]Suggestion{}
 	var concorded ConcordanceResponse
 
 	var ids []string
-	for i := 0; i < len(s); i++ {
-		for _, suggestion := range s[i] {
+	for i := 0; i < len(suggestions); i++ {
+		for _, suggestion := range suggestions[i] {
 			ids = append(ids, fp.Base(suggestion.Concept.ID))
 		}
 	}
@@ -118,17 +125,17 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Su
 	ids = dedup(ids)
 
 	if len(ids) == 0 {
-		log.WithTransactionID(tid).Info("No suggestions for calling internal concordances!")
+		logEntry.Info("No suggestions for calling internal concordances!")
 		return filtered, nil
 	}
 
-	concorded, err := suggester.Concordance.getConcordances(ids, tid, debugFlag)
+	concorded, err := s.Concordance.getConcordances(ids, tid)
 	if err != nil {
 		return filtered, err
 	}
 
 	total := 0
-	for index, suggestions := range s {
+	for index, suggestions := range suggestions {
 		filtered[index] = []Suggestion{}
 		for _, suggestion := range suggestions {
 			id := fp.Base(suggestion.Concept.ID)
@@ -143,9 +150,8 @@ func (suggester *AggregateSuggester) filterByInternalConcordances(s map[int][]Su
 		total += len(filtered[index])
 	}
 
-	if debugFlag != "" {
-		log.WithTransactionID(tid).WithField("debug", debugFlag).Infof("Retained %v of %v concepts using concordances", total, len(ids))
-	}
+	logEntry.Debugf("Retained %v of %v concepts using concordances", total, len(ids))
+
 	return filtered, nil
 }
 

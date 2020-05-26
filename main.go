@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"os"
@@ -10,13 +11,13 @@ import (
 	"time"
 
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
-	log "github.com/Financial-Times/go-logger"
-	"github.com/Financial-Times/http-handlers-go/httphandlers"
+	"github.com/Financial-Times/go-logger/v2"
+	"github.com/Financial-Times/http-handlers-go/v2/httphandlers"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	status "github.com/Financial-Times/service-status-go/httphandlers"
 	"github.com/gorilla/mux"
-	"github.com/jawher/mow.cli"
+	cli "github.com/jawher/mow.cli"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -43,6 +44,12 @@ func main() {
 		Value:  "8080",
 		Desc:   "Port to listen on",
 		EnvVar: "APP_PORT",
+	})
+	logLevel := app.String(cli.StringOpt{
+		Name:   "log-level",
+		Value:  "info",
+		Desc:   "Log level",
+		EnvVar: "LOG_LEVEL",
 	})
 	authorsSuggestionApiBaseURL := app.String(cli.StringOpt{
 		Name:   "authors-suggestion-api-base-url",
@@ -108,22 +115,19 @@ func main() {
 		EnvVar: "CONCEPT_BLACKLISTER_ENDPOINT",
 	})
 
-	log.InitDefaultLogger(*appName)
-	log.Infof("[Startup] public-suggestions-api is starting")
-
+	log := logger.NewUPPLogger(*appSystemCode, *logLevel)
 	app.Action = func() {
-		log.Infof("System code: %s, App Name: %s, Port: %s", *appSystemCode, *appName, *port)
+		log.Infof("App Name: %s, Port: %s", *appName, *port)
 
-		tr := &http.Transport{
-			MaxIdleConnsPerHost: 128,
-			DialContext: (&net.Dialer{
-				Timeout:   10 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-		}
 		c := &http.Client{
-			Transport: tr,
-			Timeout:   10 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 128,
+				DialContext: (&net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+			},
+			Timeout: 10 * time.Second,
 		}
 
 		authorsSuggester := service.NewAuthorsSuggester(*authorsSuggestionApiBaseURL, *authorsSuggestionEndpoint, c)
@@ -132,10 +136,10 @@ func main() {
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
 		blacklister := service.NewConceptBlacklister(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
-		suggester := service.NewAggregateSuggester(concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
-		healthService := NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
+		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
+		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
 
-		serveEndpoints(*port, web.NewRequestHandler(suggester), healthService)
+		serveEndpoints(*port, web.NewRequestHandler(suggester, log), healthService, log)
 
 	}
 	err := app.Run(os.Args)
@@ -145,11 +149,11 @@ func main() {
 	}
 }
 
-func serveEndpoints(port string, handler *web.RequestHandler, healthService *HealthService) {
+func serveEndpoints(port string, handler *web.RequestHandler, healthService *web.HealthService, log *logger.UPPLogger) {
 
 	serveMux := http.NewServeMux()
 
-	serveMux.HandleFunc(healthPath, fthealth.Handler(healthService))
+	serveMux.HandleFunc(web.HealthPath, fthealth.Handler(healthService))
 	serveMux.HandleFunc(status.GTGPath, status.NewGoodToGoHandler(healthService.GTG))
 	serveMux.HandleFunc(status.BuildInfoPath, status.BuildInfoHandler)
 
@@ -157,7 +161,7 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *Hea
 	servicesRouter.HandleFunc(suggestPath, handler.HandleSuggestion).Methods(http.MethodPost)
 
 	var monitoringRouter http.Handler = servicesRouter
-	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log.Logger(), monitoringRouter)
+	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log, monitoringRouter)
 	monitoringRouter = httphandlers.HTTPMetricsHandler(metrics.DefaultRegistry, monitoringRouter)
 
 	serveMux.Handle("/", monitoringRouter)
@@ -168,8 +172,8 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *Hea
 
 	wg.Add(1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			log.Infof("HTTP server closing with message: %v", err)
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.WithError(err).Error("HTTP server closing unexpectedly")
 		}
 		wg.Done()
 	}()
@@ -177,7 +181,10 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *Hea
 	waitForSignal()
 	log.Infof("[Shutdown] public-suggestions-api is shutting down")
 
-	if err := server.Close(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
 		log.Errorf("Unable to stop http server: %v", err)
 	}
 
@@ -185,7 +192,7 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *Hea
 }
 
 func waitForSignal() {
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch
 }

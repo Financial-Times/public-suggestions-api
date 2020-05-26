@@ -12,3 +12,4 @@ env:
   PUBLIC_THINGS_ENDPOINT: "/things"
   CONCEPT_BLACKLISTER_BASE_URL: "http://concept-suggestions-blacklister:8080"
   CONCEPT_BLACKLISTER_ENDPOINT: "/blacklist"
+  LOG_LEVEL: "info"

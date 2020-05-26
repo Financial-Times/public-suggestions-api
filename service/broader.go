@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
-	logger "github.com/Financial-Times/go-logger"
 )
 
 type BroaderConceptsProvider struct {
@@ -50,7 +49,7 @@ func (b *BroaderConceptsProvider) Check() v1_1.Check {
 		ID:               b.systemID,
 		BusinessImpact:   b.failureImpact,
 		Name:             fmt.Sprintf("%v Healthcheck", b.name),
-		PanicGuide:       "https://biz-ops.in.ft.com/System/public-things-api",
+		PanicGuide:       PanicGuideURL + b.systemID,
 		Severity:         2,
 		TechnicalSummary: fmt.Sprintf("%v is not available", b.name),
 		Checker:          b.healthCheck,
@@ -78,7 +77,7 @@ func (b *BroaderConceptsProvider) healthCheck() (string, error) {
 	return fmt.Sprintf("%v is healthy", b.name), nil
 }
 
-func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions map[int][]Suggestion, tid string, debugFlag string) (map[int][]Suggestion, error) {
+func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions map[int][]Suggestion, tid string) (map[int][]Suggestion, error) {
 	var ids []string
 	for _, sourceSuggestions := range suggestions {
 		for _, suggestion := range sourceSuggestions {
@@ -110,11 +109,6 @@ func (b *BroaderConceptsProvider) excludeBroaderConceptsFromResponse(suggestions
 		filteredSourceSuggestions := []Suggestion{}
 		for _, suggestion := range sourceSuggestions {
 			if broaderConceptsChecker[fp.Base(suggestion.ID)] {
-				if debugFlag != "" {
-					logger.WithField("ExcludedID", suggestion.ID).
-						WithField("ExcludedPrefLabel", suggestion.PrefLabel).
-						Info("Broader Concept excluded")
-				}
 				continue
 			}
 			filteredSourceSuggestions = append(filteredSourceSuggestions, suggestion)

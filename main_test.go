@@ -12,17 +12,12 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/go-logger/v2"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/Financial-Times/public-suggestions-api/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestMain(m *testing.M) {
-	log.InitDefaultLogger("test")
-	os.Exit(m.Run())
-}
 
 func TestMainApp(t *testing.T) {
 	expect := require.New(t)
@@ -249,17 +244,18 @@ func TestRequestHandler_all(t *testing.T) {
 		Timeout:   30 * time.Second,
 	}
 
+	log := logger.NewUPPLogger("test-service", "panic")
 	authorsSuggester := service.NewAuthorsSuggester(mockServer.URL, "/authors", c)
 	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
 	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
 	blacklister := service.NewConceptBlacklister(mockServer.URL, "/blacklist", c)
 
-	suggester := service.NewAggregateSuggester(concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
-	healthService := NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
+	suggester := service.NewAggregateSuggester(log, concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
+	healthService := web.NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
-		serveEndpoints("8081", web.NewRequestHandler(suggester), healthService)
+		serveEndpoints("8081", web.NewRequestHandler(suggester, log), healthService, log)
 	}()
 	client := &http.Client{}
 

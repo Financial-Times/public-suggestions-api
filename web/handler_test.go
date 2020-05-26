@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
-	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/go-logger/v2"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,10 +21,6 @@ import (
 const (
 	personType = "http://www.ft.com/ontology/person/Person"
 )
-
-func init() {
-	log.InitLogger("handler_test", "ERROR")
-}
 
 type mockHttpClient struct {
 	mock.Mock
@@ -59,8 +55,8 @@ func (r *faultyReader) Close() error {
 	return nil
 }
 
-func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string, flags service.Flags) (service.SuggestionsResponse, error) {
-	args := s.Called(payload, tid, flags)
+func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string) (service.SuggestionsResponse, error) {
+	args := s.Called(payload, tid)
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
@@ -97,7 +93,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 			},
 		},
 	}}
-
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockPublicThings := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
@@ -121,9 +117,9 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(expectedResp, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{}, nil)
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -132,13 +128,9 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -156,6 +148,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -173,12 +166,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -197,6 +185,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -214,12 +203,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -238,6 +222,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
@@ -255,12 +240,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -279,12 +259,13 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("Timeout error"))
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("timeout error"))
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -298,12 +279,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -321,13 +297,14 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	service.NoContentError = errors.New("No content error")
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{
 		Suggestions: make([]service.Suggestion, 0),
 	}, service.NoContentError)
 
@@ -343,12 +320,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -367,12 +339,13 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -386,12 +359,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -410,12 +378,13 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	req.Header.Add("X-Request-Id", "tid_test")
 	w := httptest.NewRecorder()
 
+	log := logger.NewUPPLogger("test-logger", "panic")
 	mockClient := new(mockHttpClient)
 	mockSuggester := new(mockSuggesterService)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test", service.Flags{}).Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
+	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
 		{
 			Concept: service.Concept{
 				IsFTAuthor: true,
@@ -426,7 +395,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 			},
 		},
 	}}, nil)
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Timeout error"))
+	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("timeout error"))
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -440,12 +409,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	}, nil)
 	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
-	handler := NewRequestHandler(&service.AggregateSuggester{
-		Concordance:     mockConcordance,
-		Suggesters:      []service.Suggester{mockSuggester},
-		BroaderProvider: broaderService,
-		Blacklister:     blacklister,
-	})
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusServiceUnavailable, w.Code)

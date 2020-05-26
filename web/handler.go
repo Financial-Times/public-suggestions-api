@@ -7,57 +7,58 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	log "github.com/Financial-Times/go-logger"
+	"github.com/Financial-Times/go-logger/v2"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	tidutils "github.com/Financial-Times/transactionid-utils-go"
 )
 
 type RequestHandler struct {
-	Suggester *service.AggregateSuggester
+	suggester *service.AggregateSuggester
+	log       *logger.UPPLogger
 }
 
-func NewRequestHandler(s *service.AggregateSuggester) *RequestHandler {
-	return &RequestHandler{Suggester: s}
-}
-
-func (handler *RequestHandler) HandleSuggestion(writer http.ResponseWriter, request *http.Request) {
-	defer request.Body.Close()
-
-	tid := tidutils.GetTransactionIDFromRequest(request)
-
-	debug := request.Header.Get("debug")
-
-	body, err := ioutil.ReadAll(request.Body)
-	if debug != "" {
-		log.WithTransactionID(tid).WithField("debug", debug).Info(string(body))
+func NewRequestHandler(s *service.AggregateSuggester, log *logger.UPPLogger) *RequestHandler {
+	return &RequestHandler{
+		suggester: s,
+		log:       log,
 	}
+}
+
+func (h *RequestHandler) HandleSuggestion(resp http.ResponseWriter, req *http.Request) {
+
+	tid := tidutils.GetTransactionIDFromRequest(req)
+	logEntry := h.log.WithTransactionID(tid)
+
+	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.WithTransactionID(tid).WithError(err).Error("Error while reading payload")
-		writeResponse(writer, http.StatusBadRequest, []byte(`{"message": "Error while reading payload"}`))
+		logEntry.WithError(err).Error("Error while reading payload")
+		writeResponse(resp, http.StatusBadRequest, []byte(`{"message": "Error while reading payload"}`))
 		return
 	}
+
+	logEntry.Debugf("request body: %s", string(body))
 	validPayload, err := validatePayload(body)
 	if !validPayload {
-		log.WithTransactionID(tid).WithError(err).Error("Client error: payload should be a non-empty JSON object")
-		writeResponse(writer, http.StatusBadRequest, []byte(`{"message": "Payload should be a non-empty JSON object"}`))
+		logEntry.WithError(err).Error("Client error: payload should be a non-empty JSON object")
+		writeResponse(resp, http.StatusBadRequest, []byte(`{"message": "Payload should be a non-empty JSON object"}`))
 		return
 	}
 
-	suggestions, err := handler.Suggester.GetSuggestions(body, tid, service.Flags{Debug: debug})
+	suggestions, err := h.suggester.GetSuggestions(body, tid)
 	if err != nil {
 		errMsg := "aggregating suggestions failed!"
-		log.WithTransactionID(tid).WithError(err).Error(errMsg)
-		writeResponse(writer, http.StatusServiceUnavailable, []byte(fmt.Sprintf(`{"message": "%v"}`, errMsg)))
+		logEntry.WithError(err).Error(errMsg)
+		writeResponse(resp, http.StatusServiceUnavailable, []byte(fmt.Sprintf(`{"message": "%s"}`, errMsg)))
 		return
 	}
 
 	if len(suggestions.Suggestions) == 0 {
-		log.WithTransactionID(tid).Warn("Suggestions are empty")
+		logEntry.Warn("Suggestions are empty")
 	}
 	//ignoring marshalling errors as neither UnsupportedTypeError nor UnsupportedValueError is possible
 	jsonResponse, _ := json.Marshal(suggestions)
 
-	writeResponse(writer, http.StatusOK, jsonResponse)
+	writeResponse(resp, http.StatusOK, jsonResponse)
 }
 
 func validatePayload(content []byte) (bool, error) {

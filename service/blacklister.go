@@ -34,13 +34,13 @@ func NewConceptBlacklister(baseUrl string, endpoint string, client Client) *Blac
 	}
 }
 
-func (b *Blacklister) IsBlacklisted(conceptId string, bl Blacklist) bool {
+func (b *Blacklister) IsAllowed(conceptId string, bl Blacklist) bool {
 	for _, uuid := range bl.UUIDS {
 		if strings.Contains(conceptId, uuid) {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func (b *Blacklister) GetBlacklist(tid string) (Blacklist, error) {

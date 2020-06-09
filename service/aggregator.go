@@ -10,25 +10,25 @@ import (
 
 const PanicGuideURL = "https://runbooks.in.ft.com/"
 
-type ConceptBlacklister interface {
-	IsBlacklisted(uuid string, bl Blacklist) bool
+type ConceptFilter interface {
+	IsAllowed(uuid string, bl Blacklist) bool
 	GetBlacklist(tid string) (Blacklist, error)
 }
 
 type AggregateSuggester struct {
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider
-	Blacklister     ConceptBlacklister
+	Filter          ConceptFilter
 	Suggesters      []Suggester
 	Log             *logger.UPPLogger
 }
 
-func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, blacklister ConceptBlacklister, suggesters ...Suggester) *AggregateSuggester {
+func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceService, broaderConceptsProvider *BroaderConceptsProvider, filter ConceptFilter, suggesters ...Suggester) *AggregateSuggester {
 	return &AggregateSuggester{
 		Concordance:     concordance,
 		Suggesters:      suggesters,
 		BroaderProvider: broaderConceptsProvider,
-		Blacklister:     blacklister,
+		Filter:          filter,
 		Log:             log,
 	}
 }
@@ -75,7 +75,7 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 	wg.Add(1)
 	go func(b Blacklist) {
 		defer wg.Done()
-		blacklist, err = s.Blacklister.GetBlacklist(tid)
+		blacklist, err = s.Filter.GetBlacklist(tid)
 		if err != nil {
 			logEntry.WithError(err).Errorf("Error retrieving concept blacklist, filtering disabled")
 		}
@@ -104,7 +104,7 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 	// preserve results order
 	for i := 0; i < len(s.Suggesters); i++ {
 		for _, suggestion := range responseMap[i] {
-			if !s.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
+			if s.Filter.IsAllowed(suggestion.ID, blacklist) {
 				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
 			}
 		}

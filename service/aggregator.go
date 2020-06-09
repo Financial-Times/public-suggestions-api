@@ -10,6 +10,11 @@ import (
 
 const PanicGuideURL = "https://runbooks.in.ft.com/"
 
+type ConceptBlacklister interface {
+	IsBlacklisted(uuid string, bl Blacklist) bool
+	GetBlacklist(tid string) (Blacklist, error)
+}
+
 type AggregateSuggester struct {
 	Concordance     *ConcordanceService
 	BroaderProvider *BroaderConceptsProvider

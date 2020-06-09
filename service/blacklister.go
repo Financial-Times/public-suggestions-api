@@ -10,12 +10,6 @@ import (
 	"github.com/Financial-Times/go-fthealth/v1_1"
 )
 
-type ConceptBlacklister interface {
-	IsBlacklisted(uuid string, bl Blacklist) bool
-	GetBlacklist(tid string) (Blacklist, error)
-	Check() v1_1.Check
-}
-
 type Blacklister struct {
 	baseUrl       string
 	endpoint      string
@@ -29,7 +23,7 @@ type Blacklist struct {
 	UUIDS []string `json:"uuids"`
 }
 
-func NewConceptBlacklister(baseUrl string, endpoint string, client Client) ConceptBlacklister {
+func NewConceptBlacklister(baseUrl string, endpoint string, client Client) *Blacklister {
 	return &Blacklister{
 		baseUrl:       baseUrl,
 		endpoint:      endpoint,

@@ -62,6 +62,10 @@ func (f *CachedConceptFilter) RefreshCache(ctx context.Context, tid string) erro
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("X-Request-Id", tid)
 
+	q := req.URL.Query()
+	q.Add("refresh", "true")
+	req.URL.RawQuery = q.Encode()
+
 	resp, err := f.client.Do(req)
 	if err != nil {
 		return err

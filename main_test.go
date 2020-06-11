@@ -226,6 +226,8 @@ func TestRequestHandler_all(t *testing.T) {
 					"things": {}
 				}`))
 		case strings.Contains(r.RequestURI, "/blacklist"):
+			v := r.URL.Query().Get("refresh")
+			assert.Equal(t, "true", v)
 			_, _ = w.Write([]byte(`{
 					"uuids": []
 				}`))

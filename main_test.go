@@ -255,7 +255,7 @@ func TestRequestHandler_all(t *testing.T) {
 	healthService := web.NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
-		serveEndpoints("8081", web.NewRequestHandler(suggester, log), healthService, log)
+		serveEndpoints("8081", web.NewRequestHandler(suggester, log), healthService, blacklister, log)
 	}()
 	client := &http.Client{}
 

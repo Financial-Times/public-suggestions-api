@@ -16,7 +16,7 @@ import (
 var ErrConceptNotAllowed = errors.New("concept is not allowed")
 
 type CachedConceptFilter struct {
-	baseUrl       string
+	baseURL       string
 	endpoint      string
 	client        Client
 	systemID      string
@@ -25,12 +25,14 @@ type CachedConceptFilter struct {
 
 	deniedUUIDs []string
 	uuidsMx     *sync.RWMutex
-	dirtyCache  bool
+
+	dirtyCache bool
+	refreshing bool
 }
 
-func NewCachedConceptFilter(baseUrl string, endpoint string, client Client) *CachedConceptFilter {
+func NewCachedConceptFilter(baseURL string, endpoint string, client Client) *CachedConceptFilter {
 	return &CachedConceptFilter{
-		baseUrl:       baseUrl,
+		baseURL:       baseURL,
 		endpoint:      endpoint,
 		client:        client,
 		systemID:      "concept-suggestions-blacklister",
@@ -38,12 +40,16 @@ func NewCachedConceptFilter(baseUrl string, endpoint string, client Client) *Cac
 		failureImpact: "Suggestions vetoing will not work",
 		uuidsMx:       &sync.RWMutex{},
 		dirtyCache:    true,
+		refreshing:    false,
 	}
 }
 
 func (f *CachedConceptFilter) IsConceptAllowed(ctx context.Context, tid string, conceptID string) error {
 	if f.dirtyCache {
-		f.RefreshCache(ctx, tid)
+		err := f.RefreshCache(ctx, tid)
+		if err != nil {
+			return err
+		}
 	}
 	if !f.isAllowed(conceptID) {
 		return ErrConceptNotAllowed
@@ -52,8 +58,17 @@ func (f *CachedConceptFilter) IsConceptAllowed(ctx context.Context, tid string, 
 }
 
 func (f *CachedConceptFilter) RefreshCache(ctx context.Context, tid string) error {
+	if f.refreshing {
+		return nil
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.baseUrl+f.endpoint, nil)
+	f.refreshing = true
+	defer func() { f.refreshing = false }()
+
+	f.uuidsMx.Lock()
+	defer f.uuidsMx.Unlock()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.baseURL+f.endpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -84,7 +99,8 @@ func (f *CachedConceptFilter) RefreshCache(ctx context.Context, tid string) erro
 	if err != nil {
 		return err
 	}
-	f.setDeniedUUIDs(blacklist.UUIDS)
+
+	f.deniedUUIDs = blacklist.UUIDS
 	f.dirtyCache = false
 	return nil
 }
@@ -102,7 +118,7 @@ func (f *CachedConceptFilter) Check() v1_1.Check {
 }
 
 func (f *CachedConceptFilter) healthCheck() (string, error) {
-	req, err := http.NewRequest("GET", f.baseUrl+"/__gtg", nil)
+	req, err := http.NewRequest("GET", f.baseURL+"/__gtg", nil)
 	if err != nil {
 		return "", err
 	}
@@ -117,24 +133,18 @@ func (f *CachedConceptFilter) healthCheck() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Health check returned a non-200 HTTP status: %v", resp.StatusCode)
+		return "", fmt.Errorf("health check returned a non-200 HTTP status: %d", resp.StatusCode)
 	}
-	return fmt.Sprintf("%v is healthy", f.name), nil
+	return fmt.Sprintf("%s is healthy", f.name), nil
 }
 
-func (f *CachedConceptFilter) isAllowed(conceptId string) bool {
+func (f *CachedConceptFilter) isAllowed(conceptID string) bool {
 	f.uuidsMx.RLock()
 	defer f.uuidsMx.RUnlock()
 	for _, uuid := range f.deniedUUIDs {
-		if strings.Contains(conceptId, uuid) {
+		if strings.Contains(conceptID, uuid) {
 			return false
 		}
 	}
 	return true
-}
-
-func (f *CachedConceptFilter) setDeniedUUIDs(uuids []string) {
-	f.uuidsMx.Lock()
-	defer f.uuidsMx.Unlock()
-	f.deniedUUIDs = uuids
 }

@@ -112,15 +112,10 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientError)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
+	filter.On("IsConceptAllowed", mock.AnythingOfType("string")).Return(true).Times(2)
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, ontotextSuggester, authorsSuggester)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, ontotextSuggester, authorsSuggester)
 
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
@@ -132,6 +127,8 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	})
 	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260", response.Suggestions[0].ID)
 	expect.Equal("http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5", response.Suggestions[1].ID)
+
+	filter.AssertExpectations(t)
 }
 
 func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testing.T) {
@@ -225,21 +222,16 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionAPI, suggestionAPI)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.Error(err)
 	expect.Equal(err.Error(), "error during calling internal concordances")
 	expect.Len(response.Suggestions, 0)
 
+	filter.AssertExpectations(t)
 	suggestionAPI.AssertExpectations(t)
 }
 
@@ -294,20 +286,9 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil).Once()
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil).Once()
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionAPI, suggestionAPI)
 
 	// 503
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -329,6 +310,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	expect.Equal("non 200 status code returned: 400", err.Error())
 	expect.Len(response.Suggestions, 0)
 
+	filter.AssertExpectations(t)
 	suggestionAPI.AssertExpectations(t)
 }
 
@@ -394,15 +376,11 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
+	filter.On("IsConceptAllowed", "authors-suggestion-api").Return(true)
+	filter.On("IsConceptAllowed", "ontotext-suggestion-api").Return(true)
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.Len(response.Suggestions, 2)
@@ -410,6 +388,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	expect.Contains(response.Suggestions, ontotextSuggestion.Suggestions[0])
 	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
+	filter.AssertExpectations(t)
 	suggestionApi.AssertExpectations(t)
 }
 
@@ -473,15 +452,11 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
+	filter.On("IsConceptAllowed", "authors-suggestion-api").Return(true)
+	filter.On("IsConceptAllowed", "ontotext-suggestion-api").Return(true)
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.NoError(err)
@@ -490,6 +465,7 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	expect.Contains(response.Suggestions, ontotextSuggestion.Suggestions[0])
 	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
+	filter.AssertExpectations(t)
 	suggestionApi.AssertExpectations(t)
 }
 
@@ -508,21 +484,16 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 0)
 	expect.NotNil(response.Suggestions)
 
+	filter.AssertExpectations(t)
 	suggestionApi.AssertExpectations(t)
 }
 
@@ -573,15 +544,12 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
+	filter.On("IsConceptAllowed", mock.AnythingOfType("string")).
+		Return(true).
+		Times(len(suggestionsResponse.Suggestions))
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.NoError(err)
@@ -589,6 +557,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 
 	expect.Equal(response.Suggestions[0].Concept.ID, "authors-suggestion-api")
 
+	filter.AssertExpectations(t)
 	suggestionApi.AssertExpectations(t)
 }
 
@@ -654,101 +623,26 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":["ontotext-suggestion-api"]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	filter := &conceptFilterMock{}
+	filter.On("IsConceptAllowed", "authors-suggestion-api").Return(true)
+	filter.On("IsConceptAllowed", "ontotext-suggestion-api").Return(false)
 
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
+	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, filter, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.Len(response.Suggestions, 1)
 
 	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
 
+	filter.AssertExpectations(t)
 	suggestionApi.AssertExpectations(t)
 }
 
-func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
-	expect := assert.New(t)
+type conceptFilterMock struct {
+	mock.Mock
+}
 
-	suggestionApi := new(mockSuggestionApi)
-	log := logger.NewUPPLogger("test-service", "panic")
-	mockClient := new(mockHttpClient)
-	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
-
-	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{
-			Predicate: "predicate",
-			Concept: Concept{
-				IsFTAuthor: false,
-				ID:         "ontotext-suggestion-api",
-				APIURL:     "apiurl1",
-				PrefLabel:  "prefLabel1",
-				Type:       ontologyPersonType},
-		},
-	},
-	}
-	authorsSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
-		{
-			Predicate: "predicate",
-			Concept: Concept{
-				IsFTAuthor: true,
-				ID:         "authors-suggestion-api",
-				APIURL:     "apiurl2",
-				PrefLabel:  "prefLabel2",
-				Type:       ontologyPersonType},
-		},
-	},
-	}
-
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
-	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
-	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
-
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: make(map[string]Concept),
-	}
-	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
-	}
-	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
-		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
-	}
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
-
-	mockClientPublicThings := new(mockHttpClient)
-	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body:       ioutil.NopCloser(strings.NewReader("")),
-		StatusCode: http.StatusOK,
-	}, nil)
-
-	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
-
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"message":"server error"}`)),
-		StatusCode: http.StatusInternalServerError,
-	}, nil)
-	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
-
-	expect.Len(response.Suggestions, 2)
-
-	expect.Contains(response.Suggestions, ontotextSuggestion.Suggestions[0])
-	expect.Contains(response.Suggestions, authorsSuggestion.Suggestions[0])
-
-	suggestionApi.AssertExpectations(t)
+func (m *conceptFilterMock) IsConceptAllowed(uuid string) bool {
+	out := m.Called(uuid)
+	return out.Bool(0)
 }

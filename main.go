@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	tidutils "github.com/Financial-Times/transactionid-utils-go"
+
 	fthealth "github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/Financial-Times/go-logger/v2"
 	"github.com/Financial-Times/http-handlers-go/v2/httphandlers"
@@ -135,7 +137,7 @@ func main() {
 		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		conceptFilter := service.NewCachedConceptFilter(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
+		conceptFilter := initializeConceptFilter(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c, log)
 		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, conceptFilter, authorsSuggester, ontotextSuggester)
 		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), conceptFilter.Check())
 
@@ -190,6 +192,22 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *web
 	}
 
 	wg.Wait()
+}
+
+func initializeConceptFilter(baseURL, endpoint string, client *http.Client, log *logger.UPPLogger) *service.CachedConceptFilter {
+	conceptFilter := service.NewCachedConceptFilter(baseURL, endpoint, client)
+	go func() {
+		tid := tidutils.NewTransactionID()
+		log.WithTransactionID(tid).Info("Initialize concept filter cache.")
+		err := conceptFilter.RefreshCache(context.Background(), tid)
+		if err != nil {
+			log.WithTransactionID(tid).WithError(err).Error("Failed to initialize concept filter.")
+		} else {
+			log.WithTransactionID(tid).Info("Concept filter cache initialized.")
+		}
+	}()
+
+	return conceptFilter
 }
 
 func waitForSignal() {

@@ -74,6 +74,12 @@ func (s *mockSuggesterService) Check() v1_1.Check {
 	return args.Get(0).(v1_1.Check)
 }
 
+type allowFilterMock struct {
+}
+
+func (m *allowFilterMock) IsConceptAllowed(uuid string) bool {
+	return true
+}
 func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	expect := assert.New(t)
 
@@ -121,16 +127,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
 	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{}, nil)
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-	service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -158,15 +155,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -195,15 +184,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -232,15 +213,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusBadRequest, w.Code)
@@ -271,15 +244,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -312,15 +277,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -351,15 +308,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusOK, w.Code)
@@ -401,15 +350,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	blacklisterMock := new(mockHttpClient)
-	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		Body: ioutil.NopCloser(strings.NewReader(
-			`{"uuids":[]}`)),
-		StatusCode: http.StatusOK,
-	}, nil)
-	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
-
-	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
+	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, &allowFilterMock{}, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
 
 	expect.Equal(http.StatusServiceUnavailable, w.Code)

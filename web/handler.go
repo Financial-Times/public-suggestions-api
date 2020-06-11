@@ -61,6 +61,18 @@ func (h *RequestHandler) HandleSuggestion(resp http.ResponseWriter, req *http.Re
 	writeResponse(resp, http.StatusOK, jsonResponse)
 }
 
+func HandleRefreshFilterCache(filter *service.CachedConceptFilter) http.HandlerFunc {
+	return func(resp http.ResponseWriter, req *http.Request) {
+		tid := tidutils.GetTransactionIDFromRequest(req)
+		err := filter.RefreshCache(req.Context(), tid)
+		if err != nil {
+			writeResponse(resp, http.StatusInternalServerError, []byte(fmt.Sprintf(`{"message": "%s"}`, err.Error())))
+			return
+		}
+		resp.WriteHeader(http.StatusOK)
+	}
+}
+
 func validatePayload(content []byte) (bool, error) {
 	var payload map[string]interface{}
 	if err := json.Unmarshal(content, &payload); err != nil {

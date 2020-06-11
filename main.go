@@ -139,7 +139,7 @@ func main() {
 		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, conceptFilter, authorsSuggester, ontotextSuggester)
 		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), conceptFilter.Check())
 
-		serveEndpoints(*port, web.NewRequestHandler(suggester, log), healthService, log)
+		serveEndpoints(*port, web.NewRequestHandler(suggester, log), healthService, conceptFilter, log)
 
 	}
 	err := app.Run(os.Args)
@@ -149,7 +149,7 @@ func main() {
 	}
 }
 
-func serveEndpoints(port string, handler *web.RequestHandler, healthService *web.HealthService, log *logger.UPPLogger) {
+func serveEndpoints(port string, handler *web.RequestHandler, healthService *web.HealthService, filter *service.CachedConceptFilter, log *logger.UPPLogger) {
 
 	serveMux := http.NewServeMux()
 
@@ -159,6 +159,7 @@ func serveEndpoints(port string, handler *web.RequestHandler, healthService *web
 
 	servicesRouter := mux.NewRouter()
 	servicesRouter.HandleFunc(suggestPath, handler.HandleSuggestion).Methods(http.MethodPost)
+	servicesRouter.HandleFunc("/refresh", web.HandleRefreshFilterCache(filter)).Methods(http.MethodPost)
 
 	var monitoringRouter http.Handler = servicesRouter
 	monitoringRouter = httphandlers.TransactionAwareRequestLoggingHandler(log, monitoringRouter)

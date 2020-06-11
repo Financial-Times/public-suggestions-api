@@ -118,7 +118,7 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, ontotextSuggester, authorsSuggester)
 
@@ -231,7 +231,7 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
@@ -305,7 +305,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil).Once()
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
 
@@ -400,7 +400,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
@@ -479,7 +479,7 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
@@ -514,7 +514,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
@@ -579,7 +579,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
@@ -660,7 +660,7 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 			`{"uuids":["ontotext-suggestion-api"]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
@@ -740,7 +740,7 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 			`{"message":"server error"}`)),
 		StatusCode: http.StatusInternalServerError,
 	}, nil)
-	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
 	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")

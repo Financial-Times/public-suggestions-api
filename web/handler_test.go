@@ -127,7 +127,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 	service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
@@ -164,7 +164,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
@@ -201,7 +201,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
@@ -238,7 +238,7 @@ func TestRequestHandler_HandleSuggestionEmptyJsonRequest(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
@@ -277,7 +277,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
@@ -318,7 +318,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
@@ -357,7 +357,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)
@@ -407,7 +407,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 			`{"uuids":[]}`)),
 		StatusCode: http.StatusOK,
 	}, nil)
-	blacklister := service.NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
+	blacklister := service.NewCachedConceptFilter("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	handler := NewRequestHandler(service.NewAggregateSuggester(log, mockConcordance, broaderService, blacklister, mockSuggester), log)
 	handler.HandleSuggestion(w, req)

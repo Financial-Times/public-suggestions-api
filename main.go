@@ -135,9 +135,9 @@ func main() {
 		broaderService := service.NewBroaderConceptsProvider(*publicThingsAPIBaseURL, *publicThingsEndpoint, c)
 
 		concordanceService := service.NewConcordance(*internalConcordancesApiBaseURL, *internalConcordancesEndpoint, c)
-		blacklister := service.NewCachedConceptFilter(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
-		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, blacklister, authorsSuggester, ontotextSuggester)
-		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), blacklister.Check())
+		conceptFilter := service.NewCachedConceptFilter(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c)
+		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, conceptFilter, authorsSuggester, ontotextSuggester)
+		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), conceptFilter.Check())
 
 		serveEndpoints(*port, web.NewRequestHandler(suggester, log), healthService, log)
 

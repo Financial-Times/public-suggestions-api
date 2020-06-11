@@ -12,8 +12,7 @@ import (
 const PanicGuideURL = "https://runbooks.in.ft.com/"
 
 type ConceptFilter interface {
-	IsAllowed(uuid string) bool
-	RefreshCache(ctx context.Context, tid string) error
+	IsConceptAllowed(ctx context.Context, tid string, uuid string) error
 }
 
 type AggregateSuggester struct {
@@ -72,15 +71,6 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err = s.Filter.RefreshCache(context.Background(), tid)
-		if err != nil {
-			logEntry.WithError(err).Errorf("Error retrieving concept blacklist, filtering disabled")
-		}
-	}()
-
 	wg.Wait()
 
 	responseMap, err = s.filterByInternalConcordances(responseMap, tid)
@@ -101,12 +91,20 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 		responseMap = results
 	}
 
+	ctx := context.Background()
 	// preserve results order
 	for i := 0; i < len(s.Suggesters); i++ {
 		for _, suggestion := range responseMap[i] {
-			if s.Filter.IsAllowed(suggestion.ID) {
-				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
+			err = s.Filter.IsConceptAllowed(ctx, tid, suggestion.ID)
+			if err != nil {
+				if errors.Is(err, ErrConceptNotAllowed) {
+					continue
+				}
+				logEntry.WithError(err).Error("Error retrieving concept blacklist, filtering disabled")
+				break
 			}
+
+			aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
 		}
 	}
 	return aggregateResp, nil

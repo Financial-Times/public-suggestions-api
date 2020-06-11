@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,8 +11,6 @@ import (
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
 )
-
-var ErrConceptNotAllowed = errors.New("concept is not allowed")
 
 type CachedConceptFilter struct {
 	baseURL       string
@@ -25,9 +22,7 @@ type CachedConceptFilter struct {
 
 	deniedUUIDs []string
 	uuidsMx     *sync.RWMutex
-
-	dirtyCache bool
-	refreshing bool
+	refreshing  bool
 }
 
 func NewCachedConceptFilter(baseURL string, endpoint string, client Client) *CachedConceptFilter {
@@ -39,32 +34,22 @@ func NewCachedConceptFilter(baseURL string, endpoint string, client Client) *Cac
 		name:          "concept-suggestions-blacklister",
 		failureImpact: "Suggestions vetoing will not work",
 		uuidsMx:       &sync.RWMutex{},
-		dirtyCache:    true,
 		refreshing:    false,
 	}
 }
 
-func (f *CachedConceptFilter) IsConceptAllowed(ctx context.Context, tid string, conceptID string) error {
-	if f.dirtyCache {
-		err := f.RefreshCache(ctx, tid)
-		if err != nil {
-			return err
+func (f *CachedConceptFilter) IsConceptAllowed(conceptID string) bool {
+	f.uuidsMx.RLock()
+	defer f.uuidsMx.RUnlock()
+	for _, uuid := range f.deniedUUIDs {
+		if strings.Contains(conceptID, uuid) {
+			return false
 		}
 	}
-	if !f.isAllowed(conceptID) {
-		return ErrConceptNotAllowed
-	}
-	return nil
+	return true
 }
 
 func (f *CachedConceptFilter) RefreshCache(ctx context.Context, tid string) error {
-	if f.refreshing {
-		return nil
-	}
-
-	f.refreshing = true
-	defer func() { f.refreshing = false }()
-
 	f.uuidsMx.Lock()
 	defer f.uuidsMx.Unlock()
 
@@ -101,7 +86,6 @@ func (f *CachedConceptFilter) RefreshCache(ctx context.Context, tid string) erro
 	}
 
 	f.deniedUUIDs = blacklist.UUIDS
-	f.dirtyCache = false
 	return nil
 }
 
@@ -136,15 +120,4 @@ func (f *CachedConceptFilter) healthCheck() (string, error) {
 		return "", fmt.Errorf("health check returned a non-200 HTTP status: %d", resp.StatusCode)
 	}
 	return fmt.Sprintf("%s is healthy", f.name), nil
-}
-
-func (f *CachedConceptFilter) isAllowed(conceptID string) bool {
-	f.uuidsMx.RLock()
-	defer f.uuidsMx.RUnlock()
-	for _, uuid := range f.deniedUUIDs {
-		if strings.Contains(conceptID, uuid) {
-			return false
-		}
-	}
-	return true
 }

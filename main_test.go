@@ -249,13 +249,13 @@ func TestRequestHandler_all(t *testing.T) {
 	ontotextSuggester := service.NewOntotextSuggester(mockServer.URL, "/ontotext", c)
 	concordance := service.NewConcordance(mockServer.URL, "/internalconcordances", c)
 	broaderProvider := service.NewBroaderConceptsProvider(mockServer.URL, "/things", c)
-	blacklister := service.NewCachedConceptFilter(mockServer.URL, "/blacklist", c)
+	filter := initializeConceptFilter(mockServer.URL, "/blacklist", c, log)
 
-	suggester := service.NewAggregateSuggester(log, concordance, broaderProvider, blacklister, authorsSuggester, ontotextSuggester)
+	suggester := service.NewAggregateSuggester(log, concordance, broaderProvider, filter, authorsSuggester, ontotextSuggester)
 	healthService := web.NewHealthService("mock", "mock", "", authorsSuggester.Check(), ontotextSuggester.Check(), broaderProvider.Check())
 
 	go func() {
-		serveEndpoints("8081", web.NewRequestHandler(suggester, log), healthService, blacklister, log)
+		serveEndpoints("8081", web.NewRequestHandler(suggester, log), healthService, filter, log)
 	}()
 	client := &http.Client{}
 

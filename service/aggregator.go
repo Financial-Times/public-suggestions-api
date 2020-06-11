@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	fp "path/filepath"
 	"sync"
@@ -12,7 +11,7 @@ import (
 const PanicGuideURL = "https://runbooks.in.ft.com/"
 
 type ConceptFilter interface {
-	IsConceptAllowed(ctx context.Context, tid string, uuid string) error
+	IsConceptAllowed(conceptID string) bool
 }
 
 type AggregateSuggester struct {
@@ -91,20 +90,12 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 		responseMap = results
 	}
 
-	ctx := context.Background()
 	// preserve results order
 	for i := 0; i < len(s.Suggesters); i++ {
 		for _, suggestion := range responseMap[i] {
-			err = s.Filter.IsConceptAllowed(ctx, tid, suggestion.ID)
-			if err != nil {
-				if errors.Is(err, ErrConceptNotAllowed) {
-					continue
-				}
-				logEntry.WithError(err).Error("Error retrieving concept blacklist, filtering disabled")
-				break
+			if s.Filter.IsConceptAllowed(suggestion.ID) {
+				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
 			}
-
-			aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
 		}
 	}
 	return aggregateResp, nil

@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -9,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	tidutils "github.com/Financial-Times/transactionid-utils-go"
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/Financial-Times/go-logger/v2"
@@ -359,4 +362,73 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	mockSuggester.AssertExpectations(t)
 	mockPublicThings.AssertExpectations(t)
 	mockClient.AssertExpectations(t)
+}
+
+func TestHandleRefreshFilterCache(t *testing.T) {
+
+	tests := map[string]struct {
+		Response     string
+		ResponseCode int
+		ExpectError  bool
+		AllowedUUIDs map[string]bool
+	}{
+		"success": {
+			Response:     `{"uuids":["blocked"]}`,
+			ResponseCode: http.StatusOK,
+			AllowedUUIDs: map[string]bool{"blocked": false, "allowed": true},
+		},
+		"blacklister internal fail": {
+			ResponseCode: http.StatusInternalServerError,
+			ExpectError:  true,
+		},
+		"broken body": {
+			Response:     `{"broken":`,
+			ResponseCode: http.StatusOK,
+			ExpectError:  true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := &http.Client{
+				Transport: &transportMock{handle: func(req *http.Request) (*http.Response, error) {
+					assert.Equal(t, "http://example.com/blacklist?refresh=true", req.URL.String())
+
+					tid := req.Header.Get(tidutils.TransactionIDHeader)
+					assert.Equal(t, "tid_test", tid)
+					agent := req.Header.Get("User-Agent")
+					assert.Equal(t, "UPP public-suggestions-api", agent)
+
+					res := httptest.NewRecorder()
+					res.Code = test.ResponseCode
+					res.Body.WriteString(test.Response)
+					return res.Result(), nil
+				}},
+			}
+
+			filter := service.NewCachedConceptFilter("http://example.com", "/blacklist", client)
+
+			err := filter.RefreshCache(context.TODO(), "tid_test")
+			if test.ExpectError {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			for id, allowed := range test.AllowedUUIDs {
+				assert.Equal(t, allowed, filter.IsConceptAllowed(id))
+			}
+		})
+	}
+}
+
+type transportMock struct {
+	handle func(r *http.Request) (*http.Response, error)
+}
+
+func (m *transportMock) RoundTrip(req *http.Request) (*http.Response, error) {
+	if m.handle == nil {
+		return nil, errors.New("handler not implemented")
+	}
+	return m.handle(req)
 }

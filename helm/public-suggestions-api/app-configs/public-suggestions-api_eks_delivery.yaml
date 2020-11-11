@@ -1,7 +1,6 @@
 # Values used for the deployed application.
 service:
   name: public-suggestions-api
-eksCluster: true
 env:
   AUTHORS_SUGGESTION_API_BASE_URL: "http://authors-suggestion-api:8080"
   AUTHORS_SUGGESTION_ENDPOINT: "/content/suggest/authors"

@@ -140,7 +140,6 @@ func main() {
 		conceptFilter := initializeConceptFilter(*conceptBlacklisterBaseUrl, *conceptBlacklisterEndpoint, c, log)
 		suggester := service.NewAggregateSuggester(log, concordanceService, broaderService, conceptFilter, authorsSuggester, ontotextSuggester)
 		healthService := web.NewHealthService(*appSystemCode, *appName, appDescription, authorsSuggester.Check(), ontotextSuggester.Check(), concordanceService.Check(), broaderService.Check(), conceptFilter.Check())
-
 		serveEndpoints(*port, web.NewRequestHandler(suggester, log), healthService, conceptFilter, log)
 
 	}
@@ -152,7 +151,6 @@ func main() {
 }
 
 func serveEndpoints(port string, handler *web.RequestHandler, healthService *web.HealthService, filter *service.CachedConceptFilter, log *logger.UPPLogger) {
-
 	serveMux := http.NewServeMux()
 
 	serveMux.HandleFunc(web.HealthPath, fthealth.Handler(healthService))

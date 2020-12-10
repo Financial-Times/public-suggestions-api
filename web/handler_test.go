@@ -365,7 +365,6 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 }
 
 func TestHandleRefreshFilterCache(t *testing.T) {
-
 	tests := map[string]struct {
 		Response     string
 		ResponseCode int

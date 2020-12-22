@@ -52,11 +52,11 @@ No
 
 ## Dependencies
 
-author-suggestion-api
-concept-suggestions-blacklister
-ontotext-suggestion-api
-internal-concordances
-public-things-api
+- author-suggestion-api
+- concept-suggestions-blacklister
+- ontotext-suggestion-api
+- internal-concordances
+- public-things-api
 
 ## Failover Architecture Type
 

@@ -52,7 +52,7 @@ No
 
 ## Dependencies
 
-- author-suggestion-api
+- authors-suggestion-api
 - concept-suggestions-blacklister
 - ontotext-suggestion-api
 - internal-concordances

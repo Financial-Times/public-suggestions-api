@@ -106,8 +106,8 @@ There is no key rotation procedure for this system.
 
 Look for the pods in the cluster health endpoint and click to see pod health and checks:
 
-- <https://upp-prod-delivery-eu.upp.ft.com/__health>
-- <https://upp-prod-delivery-us.upp.ft.com/__health>
+- <https://upp-prod-delivery-eu.upp.ft.com/__health/__pods-health?service-name=public-suggestions-api>
+- <https://upp-prod-delivery-us.upp.ft.com/__health/__pods-health?service-name=public-suggestions-api>
 
 ## First Line Troubleshooting
 

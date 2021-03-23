@@ -266,6 +266,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, errors.New("timeout error"))
+	mockSuggester.On("FilterSuggestions", mock.AnythingOfType("[]service.Suggestion")).Return([]service.Suggestion{})
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -307,6 +308,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{
 		Suggestions: make([]service.Suggestion, 0),
 	}, service.NoContentError)
+	mockSuggester.On("FilterSuggestions", mock.AnythingOfType("[]service.Suggestion")).Return([]service.Suggestion{})
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -346,6 +348,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
 	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
+	mockSuggester.On("FilterSuggestions", mock.AnythingOfType("[]service.Suggestion")).Return([]service.Suggestion{})
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,

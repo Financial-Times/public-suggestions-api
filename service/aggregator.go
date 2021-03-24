@@ -40,44 +40,36 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 	var responseMap = map[int][]Suggestion{}
-	suggestErrors := []error{}
+	aggregateErrors := []error{}
 
 	var mutex = sync.Mutex{}
 	var wg = sync.WaitGroup{}
 
 	for key, suggesterDelegate := range s.Suggesters {
 		wg.Add(1)
-		logEntry := logEntry
 		go func(i int, delegate Suggester) {
-			logEntry = logEntry.WithField("suggestions_service", delegate.GetName())
-			resp, sErr := delegate.GetSuggestions(data, tid)
+			defer wg.Done()
+			result, sErr := getSuggestions(delegate, s.Concordance, tid, data)
+
+			mutex.Lock()
+			defer mutex.Unlock()
+			// store result even if its empty
+			responseMap[i] = result
 			if sErr != nil {
 				errMsg := "error calling " + delegate.GetName()
-				errEntry := logEntry.WithError(sErr)
+				errEntry := logEntry.WithField("suggestions_service", delegate.GetName()).WithError(sErr)
 				if errors.Is(sErr, NoContentError) || errors.Is(sErr, BadRequestError) {
 					errEntry.Warn(errMsg)
 				} else {
 					errEntry.Error(errMsg)
 				}
+				//
+				var suggestErr *suggesterErr
+				if !errors.As(sErr, &suggestErr) {
+					aggregateErrors = append(aggregateErrors, sErr)
+				}
 			}
-
-			result, sErr := s.getConcordedSuggestions(tid, resp.Suggestions)
-			if sErr != nil {
-				logEntry.WithError(sErr).Error("failed to get concordances for suggestions")
-			} else {
-				result = delegate.FilterSuggestions(result)
-			}
-
-			// store result even if its empty
-			mutex.Lock()
-			responseMap[i] = result
-			if sErr != nil {
-				suggestErrors = append(suggestErrors, sErr)
-			}
-			mutex.Unlock()
-			wg.Done()
 		}(key, suggesterDelegate)
-
 	}
 
 	var blacklist Blacklist
@@ -92,9 +84,10 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 
 	wg.Wait()
 
-	if len(suggestErrors) != 0 {
-		return aggregateResp, suggestErrors[0]
+	if len(aggregateErrors) != 0 {
+		return aggregateResp, aggregateErrors[0]
 	}
+
 	results, err := s.BroaderProvider.excludeBroaderConceptsFromResponse(responseMap, tid)
 	if err != nil {
 		logEntry.WithError(err).Warn("Couldn't exclude broader concepts. Response might contain broader concepts as well")
@@ -113,11 +106,41 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 	return aggregateResp, nil
 }
 
-func (s *AggregateSuggester) getConcordedSuggestions(tid string, suggestions []Suggestion) ([]Suggestion, error) {
-	logEntry := s.Log.WithTransactionID(tid)
+// suggesterErr is a thin wrapper error for marking the origin of an error
+// This error type is introduced as a hack in order to keep the service behavior, while changing the path of the data
+type suggesterErr struct {
+	Err error
+}
 
-	logEntry.Debug("Calling internal concordances")
+func (s *suggesterErr) Error() string {
+	return s.Err.Error()
+}
 
+func (s *suggesterErr) Unwrap() error {
+	return s.Err
+}
+
+// getSuggestions requests suggestions from the Suggester delegate for the provided payload.
+// It enriches the suggestions with concept data gathered from the ConcordanceService.
+// If the delegate fails to provide suggestions, this function returns suggesterErr error that wraps the delegate error
+// This is done in order to distinguish between errors coming from the Suggester and the ones from ConcordanceService
+func getSuggestions(delegate Suggester, concordance *ConcordanceService, tid string, payload []byte) ([]Suggestion, error) {
+	resp, err := delegate.GetSuggestions(payload, tid)
+	if err != nil {
+		return nil, &suggesterErr{Err: err}
+	}
+
+	result, err := enrichSuggestionsWithConceptData(concordance, tid, resp.Suggestions)
+	if err != nil {
+		return nil, err
+	}
+	result = delegate.FilterSuggestions(result)
+
+	return result, nil
+}
+
+// enrichSuggestionsWithConceptData uses ConcordanceService to gather more information for the suggested concepts.
+func enrichSuggestionsWithConceptData(concordance *ConcordanceService, tid string, suggestions []Suggestion) ([]Suggestion, error) {
 	ids := []string{}
 	for _, suggestion := range suggestions {
 		ids = append(ids, fp.Base(suggestion.Concept.ID))
@@ -125,11 +148,10 @@ func (s *AggregateSuggester) getConcordedSuggestions(tid string, suggestions []S
 
 	ids = dedup(ids)
 	if len(ids) == 0 {
-		logEntry.Info("No suggestions for calling internal concordances!")
 		return nil, nil
 	}
 
-	concorded, err := s.Concordance.getConcordances(ids, tid)
+	concorded, err := concordance.getConcordances(ids, tid)
 	if err != nil {
 		return nil, err
 	}
@@ -145,9 +167,6 @@ func (s *AggregateSuggester) getConcordedSuggestions(tid string, suggestions []S
 			Concept:   c,
 		})
 	}
-
-	logEntry.Debugf("Retained %d of %d concepts using concordances", len(filtered), len(ids))
-
 	return filtered, nil
 }
 

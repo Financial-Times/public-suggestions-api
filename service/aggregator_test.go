@@ -500,7 +500,6 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	suggestionApi := new(mockSuggestionApi)
 	mockConcordance := new(ConcordanceService)
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Ontotext err"))
-	suggestionApi.On("FilterSuggestions", mock.AnythingOfType("[]service.Suggestion")).Return([]Suggestion{}, nil)
 
 	log := logger.NewUPPLogger("test-service", "panic")
 	mockClientPublicThings := new(mockHttpClient)
@@ -567,7 +566,6 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 	}
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(suggestionsResponse, nil).Once()
 	suggestionApi.On("FilterSuggestions", suggestionsResponse.Suggestions, mock.Anything).Return(suggestionsResponse.Suggestions).Once()
-	suggestionApi.On("FilterSuggestions", mock.AnythingOfType("[]service.Suggestion"), mock.Anything).Return([]Suggestion{}).Once()
 
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{

@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,8 +25,8 @@ const (
 )
 
 var (
-	NoContentError  = errors.New("Suggestion API returned HTTP 204")
-	BadRequestError = errors.New("Suggestion API returned HTTP 400")
+	NoContentError  = &SuggesterErr{msg: "Suggestion API returned HTTP 204"}
+	BadRequestError = &SuggesterErr{msg: "Suggestion API returned HTTP 400"}
 
 	PseudoConceptTypeAuthor = "author"
 
@@ -57,6 +56,26 @@ var (
 		},
 	}
 )
+
+// SuggesterErr is error type returned suggester GetSuggestions method
+type SuggesterErr struct {
+	msg string
+	err error
+}
+
+func (s *SuggesterErr) Error() string {
+	if s.err != nil && len(s.msg) != 0 {
+		return fmt.Sprintf("%s: %v", s.msg, s.err)
+	}
+	if s.err != nil {
+		return s.err.Error()
+	}
+	return s.msg
+}
+
+func (s *SuggesterErr) Unwrap() error {
+	return s.err
+}
 
 type Client interface {
 	Do(req *http.Request) (resp *http.Response, err error)
@@ -131,7 +150,7 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (Sugg
 
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
-		return SuggestionsResponse{}, err
+		return SuggestionsResponse{}, &SuggesterErr{err: err}
 	}
 
 	req.Header.Add("User-Agent", "UPP public-suggestions-api")
@@ -141,13 +160,13 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (Sugg
 
 	resp, err := suggester.client.Do(req)
 	if err != nil {
-		return SuggestionsResponse{}, err
+		return SuggestionsResponse{}, &SuggesterErr{err: err}
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return SuggestionsResponse{}, err
+		return SuggestionsResponse{}, &SuggesterErr{err: err}
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -157,13 +176,13 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (Sugg
 		if resp.StatusCode == http.StatusBadRequest {
 			return SuggestionsResponse{make([]Suggestion, 0)}, BadRequestError
 		}
-		return SuggestionsResponse{}, fmt.Errorf("%v returned HTTP %v", suggester.name, resp.StatusCode)
+		return SuggestionsResponse{}, &SuggesterErr{msg: fmt.Sprintf("%v returned HTTP %v", suggester.name, resp.StatusCode)}
 	}
 
 	var response SuggestionsResponse
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return SuggestionsResponse{}, err
+		return SuggestionsResponse{}, &SuggesterErr{err: err}
 	}
 	return response, nil
 }

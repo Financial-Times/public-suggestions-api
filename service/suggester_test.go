@@ -249,9 +249,9 @@ func TestOntotextSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
-
-	expect.Error(err)
-	expect.Equal("Ontotext Suggestion API returned HTTP 503", err.Error())
+	var sErr *SuggesterErr
+	expect.True(errors.As(err, &sErr))
+	expect.Equal("Ontotext Suggestion API returned HTTP 503", sErr.Error())
 	expect.Nil(suggestionResp.Suggestions)
 
 	mock.AssertExpectationsForObjects(t, mockServer)
@@ -278,8 +278,9 @@ func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Nil(suggestionResp.Suggestions)
-	expect.Error(err)
-	expect.Equal("Http Client err", err.Error())
+	var sErr *SuggesterErr
+	expect.True(errors.As(err, &sErr))
+	expect.Equal("Http Client err", sErr.Error())
 	mockClient.AssertExpectations(t)
 }
 
@@ -296,8 +297,9 @@ func TestOntotextSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
 	expect.Nil(suggestionResp.Suggestions)
-	expect.Error(err)
-	expect.Equal("Read error", err.Error())
+	var sErr *SuggesterErr
+	expect.True(errors.As(err, &sErr))
+	expect.Equal("Read error", sErr.Error())
 	mockClient.AssertExpectations(t)
 	mockBody.AssertExpectations(t)
 }
@@ -312,8 +314,9 @@ func TestOntotextSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
 	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
-	expect.Error(err)
-	expect.Equal("unexpected end of JSON input", err.Error())
+	var sErr *SuggesterErr
+	expect.True(errors.As(err, &sErr))
+	expect.Equal("unexpected end of JSON input", sErr.Error())
 	expect.Nil(suggestionResp.Suggestions)
 
 	mock.AssertExpectationsForObjects(t, mockServer)
@@ -440,8 +443,9 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
 	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
 
-	expect.Error(err)
-	expect.Equal("Error from ontotext-suggestion-api", err.Error())
+	var sErr *SuggesterErr
+	expect.True(errors.As(err, &sErr))
+	expect.Equal("Error from ontotext-suggestion-api", sErr.Error())
 
 	expect.NotNil(resp)
 	expect.Len(resp.Suggestions, 0)

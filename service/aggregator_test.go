@@ -3,10 +3,10 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"testing"
@@ -17,6 +17,48 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func newInternalConcordansesMock(t *testing.T, tid string, concepts map[string]Concept) Client {
+	headers := http.Header{}
+	headers.Add("User-Agent", "UPP public-suggestions-api")
+	headers.Add("X-Request-Id", tid)
+
+	return &http.Client{
+		Transport: &mockTransport{
+			handler: func(req *http.Request) (*http.Response, error) {
+				assert.Equal(t, headers, req.Header)
+				params := req.URL.Query()
+				assert.Equal(t, "false", params.Get("include_deprecated"))
+
+				ids := params[idsParamName]
+				responses := &ConcordanceResponse{
+					Concepts: map[string]Concept{},
+				}
+				for _, id := range ids {
+					responses.Concepts[id] = concepts[id]
+				}
+				rec := httptest.NewRecorder()
+				err := json.NewEncoder(rec.Body).Encode(responses)
+				if err != nil {
+					return nil, err
+				}
+
+				return rec.Result(), nil
+			},
+		},
+	}
+}
+
+type mockTransport struct {
+	handler func(req *http.Request) (*http.Response, error)
+}
+
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if m.handler != nil {
+		return m.handler(req)
+	}
+	panic("round trip handler not provided")
+}
 
 func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 	expect := assert.New(t)
@@ -65,51 +107,38 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	// mock internal concordances response
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: map[string]Concept{
-			"9a5e3b4a-55da-498c-816f-9c534e1392b5": {
-				ID:        "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5",
-				APIURL:    "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b5",
-				PrefLabel: "Lawrence Summers",
-				Type:      "http://www.ft.com/ontology/person/Person",
-			},
-			"9a5e3b4a-55da-498c-816f-9c534e139260": {
-				ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260",
-				APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139260",
-				PrefLabel:  "Lawrence Summers",
-				Type:       "http://www.ft.com/ontology/person/Person",
-				IsFTAuthor: true,
-			},
-		},
-	}
 	log := logger.NewUPPLogger("test-service", "panic")
-	mockClient := new(mockHttpClient)
 	mockClientError := new(mockHttpClient)
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-	req, err := http.NewRequest("GET", "internalConcordancesHost/internalconcordances", nil)
-	expect.NoError(err)
 
-	queryParams := req.URL.Query()
-	queryParams.Add(idsParamName, "9a5e3b4a-55da-498c-816f-9c534e1392b5")
-	queryParams.Add(idsParamName, "9a5e3b4a-55da-498c-816f-9c534e139265")
-	queryParams.Add(idsParamName, "9a5e3b4a-55da-498c-816f-9c534e139260")
-	queryParams.Add("include_deprecated", "false")
-	req.URL.RawQuery = queryParams.Encode()
+	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
+		"9a5e3b4a-55da-498c-816f-9c534e139260": {
+			ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260",
+			APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139260",
+			PrefLabel:  "Lawrence Summers",
+			Type:       "http://www.ft.com/ontology/person/Person",
+			IsFTAuthor: true,
+		},
+		"9a5e3b4a-55da-498c-816f-9c534e1392b5": {
+			ID:        "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e1392b5",
+			APIURL:    "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e1392b5",
+			PrefLabel: "Lawrence Summers",
+			Type:      "http://www.ft.com/ontology/person/Person",
+		},
+		"9a5e3b4a-55da-498c-816f-9c534e139265": {
+			ID:         "http://www.ft.com/thing/9a5e3b4a-55da-498c-816f-9c534e139260",
+			APIURL:     "http://api.ft.com/people/9a5e3b4a-55da-498c-816f-9c534e139260",
+			PrefLabel:  "Lawrence Summers",
+			Type:       "http://www.ft.com/ontology/person/Person",
+			IsFTAuthor: true,
+		},
+	})
 
-	req.Header.Add("User-Agent", "UPP public-suggestions-api")
-	req.Header.Add("X-Request-Id", "tid_test")
-	mockClient.On("Do", req).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 	mockClientError.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: ioutil.NopCloser(strings.NewReader("")), StatusCode: http.StatusInternalServerError}, nil)
 
 	// create all the services
 	ontotextSuggester := NewOntotextSuggester("ontotextnUrl", "ontotextEndpoint", ontotextMock)
 	authorsSuggester := NewAuthorsSuggester("authorsUrl", "authorsEndpoint", authorsMock)
-	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", internalConcordanceClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientError)
 
 	blacklisterMock := new(mockHttpClient)
@@ -237,7 +266,6 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 
 	expect.Error(err)
-	expect.Equal(err.Error(), "error during calling internal concordances")
 	expect.Len(response.Suggestions, 0)
 
 	suggestionAPI.AssertExpectations(t)
@@ -273,16 +301,6 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil)
 	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil)
 
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: make(map[string]Concept),
-	}
-	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
-	}
-	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
-		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
-	}
-
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body:       ioutil.NopCloser(strings.NewReader("")),
@@ -313,7 +331,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusServiceUnavailable,
-	}, nil).Once()
+	}, nil).Twice()
 	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 503", err.Error())
@@ -323,7 +341,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusBadRequest,
-	}, nil).Once()
+	}, nil).Twice()
 	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 400", err.Error())
@@ -337,8 +355,6 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 
 	suggestionApi := new(mockSuggestionApi)
 	log := logger.NewUPPLogger("test-service", "panic")
-	mockClient := new(mockHttpClient)
-	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
 
 	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
@@ -370,21 +386,14 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: make(map[string]Concept),
-	}
-	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
-	}
-	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
-		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
-	}
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
+	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
+		"authors-suggestion-api": {
+			IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+		},
+		"ontotext-suggestion-api": {
+			IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+		},
+	})
 
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -392,6 +401,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}, nil)
 
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", internalConcordanceClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
@@ -445,32 +455,23 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: make(map[string]Concept),
-	}
-	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
-	}
-	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
-		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
-	}
+	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
+		"authors-suggestion-api": {
+			IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+		},
+		"ontotext-suggestion-api": {
+			IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+		},
+	})
 
 	log := logger.NewUPPLogger("test-service", "panic")
-	mockClient := new(mockHttpClient)
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
-
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusOK,
 	}, nil)
 
-	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", internalConcordanceClient)
 	broaderProvider := NewBroaderConceptsProvider("publicThingsUrl", "/things", mockClientPublicThings)
 
 	blacklisterMock := new(mockHttpClient)
@@ -497,7 +498,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	mockConcordance := new(ConcordanceService)
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Ontotext err"))
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, &SuggesterErr{msg: "Ontotext err"})
 
 	log := logger.NewUPPLogger("test-service", "panic")
 	mockClientPublicThings := new(mockHttpClient)
@@ -547,7 +548,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, errors.New("Ontotext err")).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, &SuggesterErr{msg: "Ontotext err"}).Once()
 
 	suggestionsResponse := SuggestionsResponse{Suggestions: []Suggestion{
 		{
@@ -597,8 +598,15 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 
 	suggestionApi := new(mockSuggestionApi)
 	log := logger.NewUPPLogger("test-service", "panic")
-	mockClient := new(mockHttpClient)
-	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
+		"authors-suggestion-api": {
+			IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+		},
+		"ontotext-suggestion-api": {
+			IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+		},
+	})
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", internalConcordanceClient)
 
 	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
@@ -629,22 +637,6 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
-
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: make(map[string]Concept),
-	}
-	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
-	}
-	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
-		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
-	}
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -677,8 +669,15 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 
 	suggestionApi := new(mockSuggestionApi)
 	log := logger.NewUPPLogger("test-service", "panic")
-	mockClient := new(mockHttpClient)
-	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", mockClient)
+	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
+		"authors-suggestion-api": {
+			IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
+		},
+		"ontotext-suggestion-api": {
+			IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
+		},
+	})
+	mockConcordance := NewConcordance("internalConcordancesHost", "/internalconcordances", internalConcordanceClient)
 
 	ontotextSuggestion := SuggestionsResponse{Suggestions: []Suggestion{
 		{
@@ -709,22 +708,6 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
 	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
-
-	mockInternalConcResp := ConcordanceResponse{
-		Concepts: make(map[string]Concept),
-	}
-	mockInternalConcResp.Concepts["ontotext-suggestion-api"] = Concept{
-		IsFTAuthor: false, ID: "ontotext-suggestion-api", APIURL: "apiurl1", PrefLabel: "prefLabel1", Type: ontologyPersonType,
-	}
-	mockInternalConcResp.Concepts["authors-suggestion-api"] = Concept{
-		IsFTAuthor: true, ID: "authors-suggestion-api", APIURL: "apiurl2", PrefLabel: "prefLabel2", Type: ontologyPersonType,
-	}
-	expectedBody, err := json.Marshal(&mockInternalConcResp)
-	require.NoError(t, err)
-	buffer := &ClosingBuffer{
-		Buffer: bytes.NewBuffer(expectedBody),
-	}
-	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{

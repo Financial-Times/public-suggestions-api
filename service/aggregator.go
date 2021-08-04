@@ -31,13 +31,6 @@ func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceServic
 func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
 	logEntry := s.Log.WithTransactionID(tid)
 
-	data, err := getXmlSuggestionRequestFromJson(payload)
-	if err != nil {
-		data = payload
-	}
-
-	logEntry.Debugf("transformed payload: %s", string(data))
-
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
 	var responseMap = map[int][]Suggestion{}
 	type suggestionFailure struct {
@@ -53,7 +46,7 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 		wg.Add(1)
 		go func(i int, delegate Suggester) {
 			defer wg.Done()
-			result, err := getSuggestions(delegate, s.Concordance, tid, data) //nolint: govet
+			result, err := getSuggestions(delegate, s.Concordance, tid, payload) //nolint: govet
 
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -67,6 +60,7 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 	}
 
 	var blacklist Blacklist
+	var err error
 	wg.Add(1)
 	go func(b Blacklist) {
 		defer wg.Done()

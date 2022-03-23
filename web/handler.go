@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/Financial-Times/go-logger/v2"
+	"github.com/Financial-Times/public-suggestions-api/reqorigin"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	tidutils "github.com/Financial-Times/transactionid-utils-go"
 )
@@ -44,7 +45,7 @@ func (h *RequestHandler) HandleSuggestion(resp http.ResponseWriter, req *http.Re
 		return
 	}
 
-	suggestions, err := h.suggester.GetSuggestions(body, tid)
+	suggestions, err := h.suggester.GetSuggestions(body, tid, reqorigin.FromRequest(req))
 	if err != nil {
 		errMsg := "aggregating suggestions failed!"
 		logEntry.WithError(err).Error(errMsg)

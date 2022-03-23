@@ -28,7 +28,7 @@ func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceServic
 	}
 }
 
-func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+func (s *AggregateSuggester) GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error) {
 	logEntry := s.Log.WithTransactionID(tid)
 
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}

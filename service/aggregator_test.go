@@ -151,7 +151,7 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, ontotextSuggester, authorsSuggester)
 
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
@@ -263,7 +263,7 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.Error(err)
 	expect.Len(response.Suggestions, 0)
@@ -332,7 +332,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusServiceUnavailable,
 	}, nil).Twice()
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 503", err.Error())
 	expect.Len(response.Suggestions, 0)
@@ -342,7 +342,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusBadRequest,
 	}, nil).Twice()
-	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 400", err.Error())
 	expect.Len(response.Suggestions, 0)
@@ -413,7 +413,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.Len(response.Suggestions, 2)
 
@@ -483,7 +483,7 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
@@ -518,7 +518,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 0)
@@ -583,7 +583,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
@@ -655,7 +655,7 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.Len(response.Suggestions, 1)
 
@@ -726,7 +726,7 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "")
 
 	expect.Len(response.Suggestions, 2)
 

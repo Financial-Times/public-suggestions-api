@@ -28,6 +28,14 @@ func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceServic
 	}
 }
 
+// GetSuggestions calls several services to build it's return value.
+//
+// It calls concurrently the Suggesters and the Blacklister and waits them.
+// It then calls the BroaderProvider to exclude the broader concepts.
+//
+// payload is the content send to the Suggesters.
+// tid is propaged down the request chain.
+// origin is propaged down only to the Suggesters.
 func (s *AggregateSuggester) GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error) {
 	logEntry := s.Log.WithTransactionID(tid)
 
@@ -46,7 +54,7 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid, origin string) 
 		wg.Add(1)
 		go func(i int, delegate Suggester) {
 			defer wg.Done()
-			result, err := getSuggestions(delegate, s.Concordance, tid, payload) //nolint: govet
+			result, err := getSuggestions(delegate, s.Concordance, tid, origin, payload)
 
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -113,8 +121,8 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid, origin string) 
 // It enriches the suggestions with concept data gathered from the ConcordanceService.
 // If the delegate fails to provide suggestions, this function returns suggesterErr error that wraps the delegate error
 // This is done in order to distinguish between errors coming from the Suggester and the ones from ConcordanceService
-func getSuggestions(delegate Suggester, concordance *ConcordanceService, tid string, payload []byte) ([]Suggestion, error) {
-	resp, err := delegate.GetSuggestions(payload, tid)
+func getSuggestions(delegate Suggester, concordance *ConcordanceService, tid, origin string, payload []byte) ([]Suggestion, error) {
+	resp, err := delegate.GetSuggestions(payload, tid, origin)
 	if err != nil {
 		return nil, err
 	}

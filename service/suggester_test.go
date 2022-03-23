@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/Financial-Times/public-suggestions-api/reqorigin"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,8 +54,8 @@ func (m *mockSuggestionApi) FilterSuggestions(suggestions []Suggestion) []Sugges
 	return args.Get(0).([]Suggestion)
 }
 
-func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
-	args := m.Called(payload, tid)
+func (m *mockSuggestionApi) GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error) {
+	args := m.Called(payload, tid, origin)
 	return args.Get(0).(SuggestionsResponse), args.Error(1)
 }
 
@@ -80,6 +81,7 @@ func (m *mockSuggestionApiServer) startMockServer(t *testing.T) *httptest.Server
 	router.HandleFunc("/content/suggest", func(w http.ResponseWriter, r *http.Request) {
 		ua := r.Header.Get("User-Agent")
 		assert.Equal(t, "UPP public-suggestions-api", ua)
+		assert.Equal(t, reqorigin.FromRequest(r), "tests_origin")
 
 		contentTypeHeader := r.Header.Get("Content-Type")
 		acceptHeader := r.Header.Get("Accept")
@@ -164,7 +166,7 @@ func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T
 	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test")
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", "tests_origin")
 	suggestionResp.Suggestions = suggester.FilterSuggestions(suggestionResp.Suggestions)
 
 	actualSuggestions := suggestionResp.Suggestions
@@ -174,6 +176,12 @@ func TestOntotextSuggester_GetSuggestionsSuccessfullyWithoutAuthors(t *testing.T
 
 	expect.Contains(actualSuggestions, expectedSuggestions[0])
 	mock.AssertExpectationsForObjects(t, mockServer)
+}
+
+func TestErrors(t *testing.T) {
+	err := fmt.Errorf("non 200 status code returned: %d", 400)
+	var target *SuggesterErr
+	t.Logf("%v", errors.As(err, &target))
 }
 
 func TestAuthorsSuggester_CheckHealth(t *testing.T) {
@@ -248,7 +256,7 @@ func TestOntotextSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", "tests_origin")
 	var sErr *SuggesterErr
 	expect.True(errors.As(err, &sErr))
 	expect.Equal("Ontotext Suggestion API returned HTTP 503", sErr.Error())
@@ -260,7 +268,7 @@ func TestOntotextSuggester_GetSuggestionsWithServiceUnavailable(t *testing.T) {
 func TestOntotextSuggester_GetSuggestionsErrorOnNewRequest(t *testing.T) {
 	expect := assert.New(t)
 	suggester := NewOntotextSuggester(":/", "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", "tests_origin")
 
 	expect.Nil(suggestionResp.Suggestions)
 	var urlErr *url.Error
@@ -275,7 +283,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnRequestDo(t *testing.T) {
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, errors.New("Http Client err"))
 
 	suggester := NewOntotextSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", "tests_origin")
 
 	expect.Nil(suggestionResp.Suggestions)
 	var sErr *SuggesterErr
@@ -294,7 +302,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnResponseBodyRead(t *testing.T) {
 	mockBody.On("Close").Return(nil)
 
 	suggester := NewOntotextSuggester("http://test-url", "/content/suggest", mockClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", "tests_origin")
 
 	expect.Nil(suggestionResp.Suggestions)
 	var sErr *SuggesterErr
@@ -312,7 +320,7 @@ func TestOntotextSuggester_GetSuggestionsErrorOnEmptyBodyResponse(t *testing.T) 
 	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	suggestionResp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", "tests_origin")
 
 	var sErr *SuggesterErr
 	expect.True(errors.As(err, &sErr))
@@ -421,7 +429,7 @@ func TestAuthorsSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	defer server.Close()
 
 	suggester := NewAuthorsSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test")
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", "tests_origin")
 
 	actualSuggestions := suggestionResp.Suggestions
 	expect.NoError(err)
@@ -441,7 +449,7 @@ func TestOntotext_ErrorFromService(t *testing.T) {
 	ontotextHTTPMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{}, fmt.Errorf("Error from ontotext-suggestion-api"))
 
 	suggester := NewOntotextSuggester("ontotextURL", "ontotextEndpoint", ontotextHTTPMock)
-	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test")
+	resp, err := suggester.GetSuggestions([]byte("{}"), "tid_test", "tests_origin")
 
 	var sErr *SuggesterErr
 	expect.True(errors.As(err, &sErr))

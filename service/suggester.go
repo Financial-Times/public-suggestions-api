@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	health "github.com/Financial-Times/go-fthealth/v1_1"
+	"github.com/Financial-Times/public-suggestions-api/reqorigin"
 )
 
 const (
@@ -82,7 +83,7 @@ type Client interface {
 }
 
 type Suggester interface {
-	GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error)
+	GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error)
 	FilterSuggestions(suggestions []Suggestion) []Suggestion
 	GetName() string
 }
@@ -146,7 +147,7 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 	}}
 }
 
-func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error) {
 
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
@@ -157,6 +158,7 @@ func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid string) (Sugg
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-Request-Id", tid)
+	reqorigin.SetHeader(req, origin)
 
 	resp, err := suggester.client.Do(req)
 	if err != nil {

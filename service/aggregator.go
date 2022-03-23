@@ -107,14 +107,22 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid, origin string) 
 	}
 
 	// preserve results order
-	for i := 0; i < len(s.Suggesters); i++ {
-		for _, suggestion := range responseMap[i] {
-			if !s.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
-				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
-			}
-		}
+	for i := range s.Suggesters {
+		filteredSuggestions := filterDisallowedSuggestions(responseMap[i], blacklist, s.Blacklister)
+		aggregateResp.Suggestions = append(aggregateResp.Suggestions, filteredSuggestions...)
 	}
 	return aggregateResp, nil
+}
+
+func filterDisallowedSuggestions(suggestions []Suggestion, list Blacklist, blacklister ConceptBlacklister) []Suggestion {
+	result := []Suggestion{}
+	for _, s := range suggestions {
+		if !blacklister.IsBlacklisted(s.ID, list) {
+			result = append(result, s)
+		}
+	}
+
+	return result
 }
 
 // getSuggestions requests suggestions from the Suggester delegate for the provided payload.

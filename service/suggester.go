@@ -148,7 +148,6 @@ func NewOntotextSuggester(ontotextSuggestionApiBaseURL, ontotextSuggestionEndpoi
 }
 
 func (suggester *SuggestionApi) GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error) {
-
 	req, err := http.NewRequest("POST", suggester.apiBaseURL+suggester.suggestionEndpoint, bytes.NewReader(payload))
 	if err != nil {
 		return SuggestionsResponse{}, &SuggesterErr{err: err}

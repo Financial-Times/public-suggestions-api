@@ -151,7 +151,7 @@ func TestAggregateSuggester_GetAuthorSuggestionsSuccessfully(t *testing.T) {
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, ontotextSuggester, authorsSuggester)
 
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
@@ -187,7 +187,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfullyResponseFiltered(t *testin
 	defer server.Close()
 
 	suggester := NewOntotextSuggester(server.URL, "/content/suggest", http.DefaultClient)
-	suggestionResp, err := suggester.GetSuggestions(body, "tid_test")
+	suggestionResp, err := suggester.GetSuggestions(body, "tid_test", "tests_origin")
 	suggestionResp.Suggestions = suggester.FilterSuggestions(suggestionResp.Suggestions)
 
 	actualSuggestions := suggestionResp.Suggestions
@@ -228,8 +228,8 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 			},
 		},
 	}}
-	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
-	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(ontotextSuggestion, nil).Once()
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(authorsSuggestion, nil).Once()
 
 	mockInternalConcResp := ConcordanceResponse{
 		Concepts: make(map[string]Concept),
@@ -263,7 +263,7 @@ func TestAggregateSuggester_InternalConcordancesUnavailable(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionAPI, suggestionAPI)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.Error(err)
 	expect.Len(response.Suggestions, 0)
@@ -298,8 +298,8 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 			},
 		},
 	}}
-	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil)
-	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil)
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(ontotextSuggestion, nil)
+	suggestionAPI.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(authorsSuggestion, nil)
 
 	mockClientPublicThings := new(mockHttpClient)
 	mockClientPublicThings.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -332,7 +332,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusServiceUnavailable,
 	}, nil).Twice()
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 503", err.Error())
 	expect.Len(response.Suggestions, 0)
@@ -342,7 +342,7 @@ func TestAggregateSuggester_InternalConcordancesUnexpectedStatus(t *testing.T) {
 		Body:       ioutil.NopCloser(strings.NewReader("")),
 		StatusCode: http.StatusBadRequest,
 	}, nil).Twice()
-	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err = aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 	expect.Error(err)
 	expect.Equal("non 200 status code returned: 400", err.Error())
 	expect.Len(response.Suggestions, 0)
@@ -381,9 +381,9 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	},
 	}
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(ontotextSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
@@ -413,7 +413,7 @@ func TestAggregateSuggester_GetSuggestionsSuccessfully(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.Len(response.Suggestions, 2)
 
@@ -450,9 +450,9 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 			},
 		},
 	}}
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(ontotextSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	internalConcordanceClient := newInternalConcordansesMock(t, "tid_test", map[string]Concept{
@@ -483,7 +483,7 @@ func TestAggregateSuggester_GetPersonSuggestionsSuccessfully(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 2)
@@ -498,7 +498,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	expect := assert.New(t)
 	suggestionApi := new(mockSuggestionApi)
 	mockConcordance := new(ConcordanceService)
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, &SuggesterErr{msg: "Ontotext err"})
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(SuggestionsResponse{}, &SuggesterErr{msg: "Ontotext err"})
 
 	log := logger.NewUPPLogger("test-service", "panic")
 	mockClientPublicThings := new(mockHttpClient)
@@ -518,7 +518,7 @@ func TestAggregateSuggester_GetEmptySuggestionsArrayIfNoAggregatedSuggestionAvai
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 0)
@@ -548,7 +548,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 	}
 	mockClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{Body: buffer, StatusCode: http.StatusOK}, nil)
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(SuggestionsResponse{}, &SuggesterErr{msg: "Ontotext err"}).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(SuggestionsResponse{}, &SuggesterErr{msg: "Ontotext err"}).Once()
 
 	suggestionsResponse := SuggestionsResponse{Suggestions: []Suggestion{
 		{
@@ -563,7 +563,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 		},
 	},
 	}
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(suggestionsResponse, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(suggestionsResponse, nil).Once()
 	suggestionApi.On("FilterSuggestions", suggestionsResponse.Suggestions, mock.Anything).Return(suggestionsResponse.Suggestions).Once()
 
 	mockClientPublicThings := new(mockHttpClient)
@@ -583,7 +583,7 @@ func TestAggregateSuggester_GetSuggestionsNoErrorForOntotextSuggestionApi(t *tes
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, err := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.NoError(err)
 	expect.Len(response.Suggestions, 1)
@@ -633,9 +633,9 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 	},
 	}
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(ontotextSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	mockClientPublicThings := new(mockHttpClient)
@@ -655,7 +655,7 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklist(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.Len(response.Suggestions, 1)
 
@@ -704,9 +704,9 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	},
 	}
 
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(ontotextSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(ontotextSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", ontotextSuggestion.Suggestions, mock.Anything).Return(ontotextSuggestion.Suggestions).Once()
-	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test").Return(authorsSuggestion, nil).Once()
+	suggestionApi.On("GetSuggestions", mock.AnythingOfType("[]uint8"), "tid_test", "tests_origin").Return(authorsSuggestion, nil).Once()
 	suggestionApi.On("FilterSuggestions", authorsSuggestion.Suggestions, mock.Anything).Return(authorsSuggestion.Suggestions).Once()
 
 	mockClientPublicThings := new(mockHttpClient)
@@ -726,7 +726,7 @@ func TestAggregateSuggester_GetSuggestionsWithBlacklistError(t *testing.T) {
 	blacklister := NewConceptBlacklister("blacklisterUrl", "blacklisterEndpoint", blacklisterMock)
 
 	aggregateSuggester := NewAggregateSuggester(log, mockConcordance, broaderProvider, blacklister, suggestionApi, suggestionApi)
-	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test")
+	response, _ := aggregateSuggester.GetSuggestions([]byte{}, "tid_test", "tests_origin")
 
 	expect.Len(response.Suggestions, 2)
 

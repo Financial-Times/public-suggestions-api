@@ -12,6 +12,7 @@ import (
 
 	"github.com/Financial-Times/go-fthealth/v1_1"
 	"github.com/Financial-Times/go-logger/v2"
+	"github.com/Financial-Times/public-suggestions-api/reqorigin"
 	"github.com/Financial-Times/public-suggestions-api/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -55,8 +56,8 @@ func (r *faultyReader) Close() error {
 	return nil
 }
 
-func (s *mockSuggesterService) GetSuggestions(payload []byte, tid string) (service.SuggestionsResponse, error) {
-	args := s.Called(payload, tid)
+func (s *mockSuggesterService) GetSuggestions(payload []byte, tid, origin string) (service.SuggestionsResponse, error) {
+	args := s.Called(payload, tid, origin)
 	return args.Get(0).(service.SuggestionsResponse), args.Error(1)
 }
 
@@ -80,6 +81,7 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 	body := []byte(`{"id":"http://www.ft.com/thing/9d5e441e-0b02-11e8-8eb7-42f857ea9f0","byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	expectedResp := service.SuggestionsResponse{Suggestions: []service.Suggestion{
@@ -117,9 +119,9 @@ func TestRequestHandler_HandleSuggestionSuccessfully(t *testing.T) {
 		Client: mockPublicThings,
 	}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(expectedResp, nil).Once()
+	mockSuggester.On("GetSuggestions", body, "tid_test", "tests_origin").Return(expectedResp, nil).Once()
 	mockSuggester.On("FilterSuggestions", expectedResp.Suggestions, mock.Anything).Return(expectedResp.Suggestions).Once()
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", "tests_origin").Return(service.SuggestionsResponse{}, nil)
 
 	blacklisterMock := new(mockHttpClient)
 	blacklisterMock.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
@@ -146,6 +148,7 @@ func TestRequestHandler_HandleSuggestionErrorOnRequestRead(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/content/suggest", &faultyReader{})
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	log := logger.NewUPPLogger("test-logger", "panic")
@@ -183,6 +186,7 @@ func TestRequestHandler_HandleSuggestionEmptyBody(t *testing.T) {
 	body := []byte("")
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	log := logger.NewUPPLogger("test-logger", "panic")
@@ -257,6 +261,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	log := logger.NewUPPLogger("test-logger", "panic")
@@ -265,7 +270,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetSuggestions(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, &service.SuggesterErr{})
+	mockSuggester.On("GetSuggestions", body, "tid_test", "tests_origin").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, &service.SuggesterErr{})
 
 	broaderService := &service.BroaderConceptsProvider{
 		Client: mockPublicThings,
@@ -295,6 +300,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	log := logger.NewUPPLogger("test-logger", "panic")
@@ -303,7 +309,7 @@ func TestRequestHandler_HandleSuggestionOkWhenNoContentSuggestions(t *testing.T)
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{
+	mockSuggester.On("GetSuggestions", body, "tid_test", "tests_origin").Return(service.SuggestionsResponse{
 		Suggestions: make([]service.Suggestion, 0),
 	}, service.NoContentError)
 
@@ -336,6 +342,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	body := []byte(`{"byline":"Test byline","bodyXML":"Test body","title":"Test title"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	log := logger.NewUPPLogger("test-logger", "panic")
@@ -344,7 +351,7 @@ func TestRequestHandler_HandleSuggestionOkWhenEmptySuggestions(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
+	mockSuggester.On("GetSuggestions", body, "tid_test", "tests_origin").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{}}, nil)
 	mockSuggester.On("FilterSuggestions", mock.AnythingOfType("[]service.Suggestion")).Return([]service.Suggestion{})
 
 	broaderService := &service.BroaderConceptsProvider{
@@ -376,6 +383,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	body := []byte(`{"bodyXML":"Test body"}`)
 	req := httptest.NewRequest("POST", "/content/suggest", bytes.NewReader(body))
 	req.Header.Add("X-Request-Id", "tid_test")
+	reqorigin.SetHeader(req, "tests_origin")
 	w := httptest.NewRecorder()
 
 	log := logger.NewUPPLogger("test-logger", "panic")
@@ -384,7 +392,7 @@ func TestRequestHandler_HandleSuggestionErrorOnGetConcordance(t *testing.T) {
 	mockPublicThings := new(mockHttpClient)
 	mockConcordance := &service.ConcordanceService{ConcordanceBaseURL: "concordanceBaseURL", ConcordanceEndpoint: "concordanceEndpoint", Client: mockClient}
 
-	mockSuggester.On("GetSuggestions", body, "tid_test").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
+	mockSuggester.On("GetSuggestions", body, "tid_test", "tests_origin").Return(service.SuggestionsResponse{Suggestions: []service.Suggestion{
 		{
 			Concept: service.Concept{
 				IsFTAuthor: true,

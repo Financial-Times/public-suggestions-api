@@ -28,7 +28,15 @@ func NewAggregateSuggester(log *logger.UPPLogger, concordance *ConcordanceServic
 	}
 }
 
-func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (SuggestionsResponse, error) {
+// GetSuggestions calls several services to build it's return value.
+//
+// It calls concurrently the Suggesters and the Blacklister and waits them.
+// It then calls the BroaderProvider to exclude the broader concepts.
+//
+// payload is the content send to the Suggesters.
+// tid is propaged down the request chain.
+// origin is propaged down only to the Suggesters.
+func (s *AggregateSuggester) GetSuggestions(payload []byte, tid, origin string) (SuggestionsResponse, error) {
 	logEntry := s.Log.WithTransactionID(tid)
 
 	var aggregateResp = SuggestionsResponse{Suggestions: make([]Suggestion, 0)}
@@ -46,7 +54,7 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 		wg.Add(1)
 		go func(i int, delegate Suggester) {
 			defer wg.Done()
-			result, err := getSuggestions(delegate, s.Concordance, tid, payload) //nolint: govet
+			result, err := getSuggestions(delegate, s.Concordance, tid, origin, payload)
 
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -99,22 +107,30 @@ func (s *AggregateSuggester) GetSuggestions(payload []byte, tid string) (Suggest
 	}
 
 	// preserve results order
-	for i := 0; i < len(s.Suggesters); i++ {
-		for _, suggestion := range responseMap[i] {
-			if !s.Blacklister.IsBlacklisted(suggestion.ID, blacklist) {
-				aggregateResp.Suggestions = append(aggregateResp.Suggestions, suggestion)
-			}
-		}
+	for i := range s.Suggesters {
+		filteredSuggestions := filterDisallowedSuggestions(responseMap[i], blacklist, s.Blacklister)
+		aggregateResp.Suggestions = append(aggregateResp.Suggestions, filteredSuggestions...)
 	}
 	return aggregateResp, nil
+}
+
+func filterDisallowedSuggestions(suggestions []Suggestion, list Blacklist, blacklister ConceptBlacklister) []Suggestion {
+	result := []Suggestion{}
+	for _, s := range suggestions {
+		if !blacklister.IsBlacklisted(s.ID, list) {
+			result = append(result, s)
+		}
+	}
+
+	return result
 }
 
 // getSuggestions requests suggestions from the Suggester delegate for the provided payload.
 // It enriches the suggestions with concept data gathered from the ConcordanceService.
 // If the delegate fails to provide suggestions, this function returns suggesterErr error that wraps the delegate error
 // This is done in order to distinguish between errors coming from the Suggester and the ones from ConcordanceService
-func getSuggestions(delegate Suggester, concordance *ConcordanceService, tid string, payload []byte) ([]Suggestion, error) {
-	resp, err := delegate.GetSuggestions(payload, tid)
+func getSuggestions(delegate Suggester, concordance *ConcordanceService, tid, origin string, payload []byte) ([]Suggestion, error) {
+	resp, err := delegate.GetSuggestions(payload, tid, origin)
 	if err != nil {
 		return nil, err
 	}
